@@ -8,6 +8,8 @@ from pathlib import Path
 script_dir = Path(__file__).resolve().parent
 df = pd.read_csv(f'{script_dir.parent}/data/openalex_frontier_ai_works.csv')
 
+print(f"Total number of papers in the dataset: {len(df)}")
+
 #retrieve the most impactful open access papers (with cited count > 100 or fwci > 50) available on arxiv 
 cited_cnt_threshold = 100
 fwci_threshold = 50
@@ -15,6 +17,8 @@ fwci_threshold = 50
 df = df[df['is_open_access'] == True]
 imp_papers = df[(df['cited_by_count'] > cited_cnt_threshold) | (df['fwci'] > fwci_threshold)]
 arxiv_papers = imp_papers[(~imp_papers['open_access_url'].isna()) & (imp_papers['open_access_url'].str.contains('arxiv.org/pdf'))]
+
+print(f"Number of impactful open access papers available on arxiv: {len(arxiv_papers)}")
 
 #retrieve and store metadata
 cols = ['doi', 'title', 'publication_date', 'first_author_name', 'last_author_name', 'open_access_url']

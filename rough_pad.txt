@@ -25,3 +25,916 @@
   "source_url": "https://arxiv.org/abs/1706.03762",
   "pdf_path": "documents/8f3a.../paper.pdf"
 }
+
+
+
+
+Absolutely. Here's a **self-contained project context summary** you can paste into a new conversation when working on a specific subtask.
+
+---
+
+# RAG Architecture Project — Context for New Conversations
+
+## 1. Project goal
+
+I'm building a portfolio-quality **event-driven RAG system** that runs locally and demonstrates both:
+
+* practical RAG/LLM engineering
+* distributed/event-driven architecture using Kafka and worker processes
+
+The system should be reasonably sophisticated but not over-engineered. The goal is to build it incrementally, with a working MVP first and optional production-oriented refinements later.
+
+---
+
+## 2. Development environment
+
+I'm developing on:
+
+* Windows host
+* WSL2
+* Docker Engine installed **directly inside WSL**
+* **No Docker Desktop**, primarily to reduce RAM usage
+* VS Code connected to the project in the WSL filesystem
+* `uv` is used for Python dependency management
+* Git is used with the project in WSL
+* One Git repository / one Python codebase is preferred
+
+Docker containers will run inside the WSL Docker Engine.
+
+For local development, Docker services communicate with each other using Docker Compose service names, e.g.:
+
+```text
+kafka:9092
+```
+
+rather than `localhost:9092`.
+
+---
+
+# 3. High-level architecture
+
+The system has two major flows.
+
+### Document ingestion flow
+
+```text
+Local PDF / URL
+      │
+      ▼
+Watcher or API
+      │
+      ▼
+Kafka
+      │
+      ▼
+Fetcher
+      │
+      ▼
+Parser / Chunker
+      │
+      ▼
+Indexer
+      │
+      ▼
+Qdrant
+```
+
+### Query/RAG flow
+
+```text
+User
+  │
+  ▼
+Frontend
+  │
+  ▼
+Backend API
+  │
+  ▼
+Query embedding
+  │
+  ▼
+Qdrant
+  │
+  ▼
+Retrieved chunks
+  │
+  ▼
+LLM
+  │
+  ▼
+Answer
+  │
+  ▼
+Frontend
+```
+
+The conceptual distinction is:
+
+* **API** = synchronous HTTP entry point
+* **Ingestion** = asynchronous document-processing pipeline
+* **RAG** = synchronous retrieval + generation/query pipeline
+* **Storage** = persistence/state management
+
+---
+
+# 4. Planned components
+
+### Frontend
+
+Simple UI for:
+
+* uploading/submitting documents
+* submitting URLs
+* viewing document ingestion status
+* asking questions
+* displaying answers and sources
+
+Technology is not finalized yet. Could be a separate frontend application such as React, or potentially something simpler.
+
+### Backend/API
+
+Likely FastAPI.
+
+Responsible for HTTP requests such as:
+
+```text
+POST /documents
+POST /documents/url
+GET  /documents/{id}
+POST /query
+```
+
+The API should not perform the entire ingestion pipeline synchronously.
+
+For URL ingestion, the API can:
+
+1. create a document record
+2. generate a `document_id`
+3. publish a Kafka `document.received` event
+
+For local files, the file watcher can generate the same type of event.
+
+---
+
+# 5. Ingestion architecture
+
+The ingestion pipeline currently envisioned is:
+
+```text
+             ┌───────────────┐
+             │ File Watcher  │
+             └───────┬───────┘
+                     │
+             document.received
+                     │
+                     ▼
+                   Kafka
+                     │
+                     ▼
+             ┌───────────────┐
+             │    Fetcher    │
+             └───────┬───────┘
+                     │
+              document.fetched
+                     │
+                     ▼
+                   Kafka
+                     │
+                     ▼
+             ┌───────────────┐
+             │ Parser/Chunker│
+             └───────┬───────┘
+                     │
+               chunks.created
+                     │
+                     ▼
+                   Kafka
+                     │
+                     ▼
+             ┌───────────────┐
+             │    Indexer    │
+             └───────┬───────┘
+                     │
+                     ▼
+                   Qdrant
+```
+
+Potentially later:
+
+```text
+Fetcher
+   ↓
+Parser
+   ↓
+Chunker
+   ↓
+Embedder
+   ↓
+Indexer
+   ↓
+Qdrant
+```
+
+But this should be introduced only if it makes sense for the implementation.
+
+---
+
+# 6. Two document sources
+
+There are two ingestion entry points.
+
+## Local PDFs
+
+A PDF is explicitly placed into:
+
+```text
+staging/incoming/
+```
+
+The file watcher detects it and publishes:
+
+```text
+document.received
+```
+
+Example event:
+
+```json
+{
+  "event_type": "document.received",
+  "document_id": "...",
+  "source_type": "local_file",
+  "source": "/staging/incoming/paper.pdf"
+}
+```
+
+## Web URLs
+
+A user submits a URL through the UI.
+
+The API creates the document record and publishes:
+
+```text
+document.received
+```
+
+Example:
+
+```json
+{
+  "event_type": "document.received",
+  "document_id": "...",
+  "source_type": "url",
+  "source": "https://example.com/paper.pdf"
+}
+```
+
+The Fetcher then knows whether to download the URL or copy the local file.
+
+The important architectural idea is:
+
+> Different ingestion sources converge into the same `document.received` Kafka event and the same downstream pipeline.
+
+---
+
+# 7. Kafka design decisions
+
+Kafka itself runs in a **Docker container**.
+
+The application components use Kafka clients.
+
+For now, Kafka producer/consumer logic can live directly inside the relevant worker. There is **no need for a dedicated `kafka/` Python folder yet**.
+
+For example:
+
+```text
+workers/
+├── fetcher.py
+├── chunker.py
+└── indexer.py
+```
+
+Each worker can create its own Kafka consumer/producer.
+
+Only introduce shared Kafka abstractions later if there is meaningful duplication, e.g.:
+
+```text
+events/
+├── producer.py
+├── consumer.py
+└── topics.py
+```
+
+Kafka topics should represent event types / stages rather than individual documents.
+
+For example:
+
+```text
+document-received
+document-fetched
+chunks-created
+document-indexed
+```
+
+Do **not** create a Kafka topic per document.
+
+Kafka messages should generally contain metadata/references, not entire PDFs.
+
+---
+
+# 8. Chunk event granularity
+
+Initially, prefer **one `chunks.created` event per document**, containing a reference to the generated chunk artifact, rather than one Kafka event per chunk.
+
+For example:
+
+```json
+{
+  "event_type": "chunks.created",
+  "document_id": "...",
+  "chunk_count": 143,
+  "chunks_uri": "/staging/chunks/<document_id>.jsonl"
+}
+```
+
+The chunk file can contain:
+
+```json
+{"chunk_id":"...","text":"...","metadata":{}}
+{"chunk_id":"...","text":"...","metadata":{}}
+```
+
+Later, if fine-grained Kafka parallelism is useful, we can consider one event per chunk.
+
+---
+
+# 9. Staging/storage design
+
+For local development, use the **WSL filesystem + Docker bind mounts**, rather than Docker-managed named volumes for the staging files.
+
+Recommended:
+
+```text
+rag-architecture/
+├── staging/
+│   ├── incoming/
+│   ├── fetched/
+│   └── chunks/
+```
+
+The containers can mount:
+
+```yaml
+volumes:
+  - ./staging:/staging
+```
+
+This means:
+
+```text
+WSL:
+~/rag-architecture/staging/incoming/paper.pdf
+
+Docker:
+ /staging/incoming/paper.pdf
+```
+
+Both access the same underlying files.
+
+This is preferable because the file watcher can also directly access the WSL filesystem.
+
+---
+
+# 10. File lifecycle
+
+Current preferred approach:
+
+```text
+staging/incoming/
+```
+
+is a temporary drop zone.
+
+After successful fetching/copying, the original input can be moved/deleted.
+
+The fetched PDF:
+
+```text
+staging/fetched/
+```
+
+should initially be retained rather than immediately deleted.
+
+Reasons:
+
+* debugging
+* retrying
+* inspecting parser input
+* reproducibility
+
+Similarly, generated chunk artifacts can initially be retained.
+
+A future cleanup job can remove old artifacts based on age/status.
+
+Don't over-engineer cleanup yet.
+
+---
+
+# 11. File watcher execution
+
+The file watcher is a long-running process.
+
+Initially it can simply be run manually from WSL:
+
+```bash
+uv run python -m rag_architecture.ingestion.watcher.file_watcher
+```
+
+It remains alive and watches:
+
+```text
+staging/incoming/
+```
+
+until interrupted.
+
+For example:
+
+```text
+Terminal 1:
+uv run python -m rag_architecture.ingestion.watcher.file_watcher
+
+Terminal 2:
+docker compose up
+```
+
+Eventually, it is probably cleaner to run the watcher as a Docker Compose service so:
+
+```bash
+docker compose up
+```
+
+starts:
+
+* Kafka
+* Qdrant
+* API
+* watcher
+* fetcher
+* chunker
+* indexer
+
+But this can be done later.
+
+---
+
+# 12. SQLite
+
+SQLite should **not** live inside one worker such as the chunker.
+
+Different components need to access/update document state.
+
+For the local POC, keep the database file on the WSL filesystem:
+
+```text
+data/
+└── rag.db
+```
+
+and mount it into relevant containers.
+
+Conceptually:
+
+```text
+                    SQLite
+                  data/rag.db
+                       ▲
+          ┌────────────┼────────────┐
+          │            │            │
+       API          Fetcher      Chunker/Indexer
+```
+
+SQLite is used for **current document/job state**, not as the event bus.
+
+Potential document fields:
+
+```text
+document_id
+source_type
+source
+status
+source_path
+fetched_path
+chunk_count
+error
+created_at
+updated_at
+```
+
+Possible states:
+
+```text
+RECEIVED
+FETCHED
+CHUNKED
+INDEXED
+FAILED
+```
+
+Kafka tells workers what work needs to happen.
+
+SQLite tells the system what the current state of a document is.
+
+For a larger production deployment, SQLite could conceptually be replaced by PostgreSQL without changing that role.
+
+---
+
+# 13. Idempotency
+
+The ingestion pipeline should eventually account for worker failures and Kafka redelivery.
+
+Example:
+
+```text
+Indexer
+   ↓
+writes to Qdrant
+   ↓
+crashes before Kafka acknowledgement
+   ↓
+same event delivered again
+```
+
+Therefore workers should be idempotent.
+
+Use deterministic IDs:
+
+```text
+document_id
+    ├── chunk_id 1
+    ├── chunk_id 2
+    └── chunk_id N
+```
+
+Qdrant point IDs can be deterministic based on:
+
+```text
+document_id + chunk_index
+```
+
+so reprocessing a chunk doesn't create duplicates.
+
+This can be added after the basic pipeline works.
+
+---
+
+# 14. Event semantics
+
+Prefer immutable stage events:
+
+```text
+document.received
+       ↓
+document.fetched
+       ↓
+chunks.created
+       ↓
+document.indexed
+```
+
+rather than continuously mutating one event.
+
+Failures can eventually have separate failure events or status tracking.
+
+---
+
+# 15. Document IDs
+
+The ingestion entry point should generate a `document_id`.
+
+The ID should be created before publishing the first Kafka event so that:
+
+* SQLite can track the document
+* Kafka events can reference it
+* fetched/chunked/indexed artifacts can use it
+* the UI can query its status
+
+Keep the document ID separate from the physical storage path.
+
+Example:
+
+```json
+{
+  "document_id": "01JXYZ...",
+  "document_uri": "/staging/fetched/01JXYZ....pdf"
+}
+```
+
+Later the URI could become:
+
+```text
+s3://bucket/documents/...
+```
+
+without changing the document identity.
+
+---
+
+# 16. Project structure
+
+Current preferred structure:
+
+```text
+rag-architecture/
+│
+├── src/
+│   └── rag_architecture/
+│       │
+│       ├── api/
+│       │   ├── main.py
+│       │   └── routes/
+│       │       ├── documents.py
+│       │       └── query.py
+│       │
+│       ├── ingestion/
+│       │   ├── watcher/
+│       │   │   └── file_watcher.py
+│       │   │
+│       │   └── workers/
+│       │       ├── fetcher.py
+│       │       ├── parser.py
+│       │       ├── chunker.py
+│       │       └── indexer.py
+│       │
+│       ├── rag/
+│       │   ├── embeddings/
+│       │   ├── retrieval/
+│       │   ├── llm/
+│       │   └── pipeline.py
+│       │
+│       ├── storage/
+│       │   ├── database.py
+│       │   └── repositories/
+│       │
+│       └── common/
+│
+├── frontend/
+│
+├── staging/
+│   ├── incoming/
+│   ├── fetched/
+│   └── chunks/
+│
+├── data/
+│   └── rag.db
+│
+├── tests/
+│
+├── Dockerfile
+├── docker-compose.yml
+├── pyproject.toml
+├── uv.lock
+├── .dockerignore
+└── README.md
+```
+
+Important decisions:
+
+* One root `src/` for the Python codebase.
+* Do **not** create a `src/` under each Python subsystem.
+* `frontend/` is parallel to `src/` if it is a separate frontend technology/project.
+* If the frontend is Python-based (e.g. Streamlit), it could instead live inside the Python package.
+* `Dockerfile` and `docker-compose.yml` live at the **repository root**, not under `src/` or `ingestion/`.
+* No `docker/` directory is needed yet.
+* `staging/` and `data/` are runtime data, not source code.
+
+---
+
+# 17. One codebase, multiple containers
+
+The project should remain a **single Python codebase**, even though there will be multiple runtime containers.
+
+Conceptually:
+
+```text
+                   ONE CODEBASE
+                        │
+       ┌────────────────┼────────────────┐
+       ▼                ▼                ▼
+      API            Fetcher          Chunker
+   container        container        container
+```
+
+They can use the same Docker image but different commands.
+
+For example:
+
+```text
+python -m rag_architecture.api.main
+python -m rag_architecture.ingestion.watcher.file_watcher
+python -m rag_architecture.ingestion.workers.fetcher
+python -m rag_architecture.ingestion.workers.chunker
+python -m rag_architecture.ingestion.workers.indexer
+```
+
+The containers are deployment/runtime units, not necessarily separate Python projects.
+
+---
+
+# 18. Docker setup
+
+Current setup already uses `uv` inside Docker.
+
+The project previously had a Dockerfile pattern along these lines:
+
+```dockerfile
+WORKDIR /app
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+COPY pyproject.toml uv.lock ./
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --only-group workers
+
+COPY . .
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen
+```
+
+However, we subsequently decided to **separate worker dependencies from normal application dependencies**, so worker containers should install only the worker dependency group where appropriate.
+
+Adding a worker-only dependency is:
+
+```bash
+uv add --group workers pypdf
+```
+
+Normal application dependency:
+
+```bash
+uv add qdrant-client
+```
+
+Development dependency:
+
+```bash
+uv add --dev pytest
+```
+
+Both `pyproject.toml` and `uv.lock` should be committed.
+
+---
+
+# 19. Current Kafka test
+
+Kafka connectivity has already been verified.
+
+Producer and consumer successfully exchanged messages.
+
+Example:
+
+```text
+rag-producer | Published event 1 to topic=test-events, partition=0, offset=0
+rag-consumer | Received event: {'event_id': 1, 'message': 'Hello from producer 1'} ...
+```
+
+The producer exits after publishing its finite set of messages.
+
+The consumer uses an ongoing loop and therefore remains running, waiting for additional Kafka messages.
+
+Kafka topic `test-events` currently has 3 partitions, which was inferred from messages appearing on partitions:
+
+```text
+0
+1
+2
+```
+
+The exact partition count is controlled by the Kafka topic/broker configuration.
+
+---
+
+# 20. Scope strategy
+
+The project is intentionally being built incrementally.
+
+Do **not** immediately implement:
+
+* Kubernetes
+* Spark/Flink
+* multiple Kafka brokers
+* schema registry
+* Redis
+* Elasticsearch
+* elaborate authentication
+* distributed tracing
+* exactly-once semantics
+* sophisticated retry orchestration
+* autoscaling
+* cloud deployment
+* complex frontend
+* elaborate agent architecture
+
+The initial MVP should be:
+
+```text
+Local PDF / URL
+      ↓
+Watcher/API
+      ↓
+Kafka
+      ↓
+Fetcher
+      ↓
+Parser/Chunker
+      ↓
+Indexer
+      ↓
+Qdrant
+
+Question
+      ↓
+API
+      ↓
+Qdrant
+      ↓
+LLM
+      ↓
+Answer
+```
+
+Then add:
+
+* frontend
+* SQLite status tracking
+* retries
+* idempotency
+* better observability
+* other production-oriented refinements
+
+only if useful.
+
+The goal is a **small but working and well-reasoned event-driven RAG system**, rather than a huge architecture with many unfinished components.
+
+---
+
+# 21. Recommended implementation order
+
+### Milestone 1 — completed
+
+```text
+Producer → Kafka → Consumer
+```
+
+### Milestone 2
+
+```text
+PDF → file watcher → Kafka → fetcher
+```
+
+### Milestone 3
+
+```text
+PDF → watcher → Kafka → fetcher → parser → chunker
+```
+
+### Milestone 4
+
+```text
+PDF → watcher → Kafka → fetcher → parser → chunker → Qdrant
+```
+
+### Milestone 5
+
+```text
+Question → Qdrant → LLM → Answer
+```
+
+### Milestone 6
+
+Connect the UI.
+
+### Milestone 7
+
+Add SQLite status tracking, retries, idempotency, cleanup, etc.
+
+---
+
+## Current immediate focus
+
+The Kafka connectivity test is working.
+
+The next logical implementation task is the **file watcher**, which should:
+
+1. continuously watch `staging/incoming/`
+2. detect newly added PDFs
+3. generate a `document_id`
+4. create/update the corresponding SQLite document record if we introduce SQLite at this stage
+5. publish a `document.received` Kafka event
+6. avoid processing the same physical file multiple times
+7. eventually work either as a WSL process initially or as a Docker Compose service
+
+For the first implementation, keep it simple and avoid prematurely adding retries, sophisticated state machines, or production-grade scheduling.

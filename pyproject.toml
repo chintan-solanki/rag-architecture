@@ -1,7 +1,7 @@
 [project]
-name = "rag-demo"
+name = "rag_architecture"
 version = "0.1.0"
-description = "Add your description here"
+description = "RAG architecture for hybrid search and citation backed responses"
 readme = "README.md"
 authors = [
     { name = "chintan-solanki", email = "chinsol.8973@gmail.com" }
@@ -11,16 +11,21 @@ dependencies = [
     "arxiv>=4.0.1",
     "numpy>=2.5.2",
     "pandas>=3.0.5",
+    "watchdog>=6.0.0",
 ]
 
-[project.scripts]
-rag-demo = "rag_demo:main"
+#[project.scripts]
+#rag-architecture = "rag_architecture:main"
 
 [build-system]
 requires = ["uv_build>=0.12.3,<0.13.0"]
 build-backend = "uv_build"
 
 [dependency-groups]
+ingestion = [
+    "kafka-python>=2.2.15",
+    "watchdog>=6.0.0",
+]
 dev = [
     "ipykernel>=7.3.0",
 ]
