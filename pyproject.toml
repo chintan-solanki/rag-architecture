@@ -6,11 +6,11 @@ readme = "README.md"
 authors = [
     { name = "chintan-solanki", email = "chinsol.8973@gmail.com" }
 ]
-requires-python = ">=3.13"
+requires-python = ">=3.13,<3.14"
 dependencies = [
     "arxiv>=4.0.1",
     "numpy>=2.5.2",
-    "pandas>=3.0.5",
+    "pandas>=2.3,<3",
     "watchdog>=6.0.0",
 ]
 
@@ -27,5 +27,12 @@ ingestion = [
     "watchdog>=6.0.0",
 ]
 dev = [
+    "dotenv>=0.9.9",
     "ipykernel>=7.3.0",
+    "llama-index>=0.14.24",
+    "llama-index-embeddings-huggingface>=0.7.0",
+    "llama-index-readers-file>=0.6.0",
+    "markdown-it-py>=4.2.0",
+    "pymupdf>=1.28.2",
+    "pymupdf4llm>=1.28.2",
 ]

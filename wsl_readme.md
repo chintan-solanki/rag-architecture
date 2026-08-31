@@ -1,3 +1,9 @@
+Uv sync
+-------
+
+Run uv sync --link-mode=copy instead of uv sync.
+This is to bypass security error thrown by ntkl inside llamaindex
+
 Run the project in WSL.
 -------------------------------
 

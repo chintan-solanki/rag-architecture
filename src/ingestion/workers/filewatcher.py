@@ -26,7 +26,6 @@ FETCHED_DIR = Path(os.getenv("FETCHED_DIR", "/app/staging/fetched"))
 kafka_helper = KafkaHelper()
 
 
-
 def make_unique_destination(source: Path) -> Path:
     
     destination = FETCHED_DIR / source.name

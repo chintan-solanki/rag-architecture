@@ -1,0 +1,2 @@
+Foo and Bar live in Mumbai! 
+Foo was born in Mumbai, but Bar was born in Pune.
