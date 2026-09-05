@@ -25,22 +25,24 @@ Returns chunk object for a given llamaindex chunk
 from llama_index.core import StorageContext, VectorStoreIndex
 from llama_index.core.agent.workflow import FunctionAgent
 from llama_index.llms.openai import OpenAI
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.core.schema import Document, NodeRelationship
 from llama_index.core.node_parser import SentenceSplitter
 
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.core.vector_stores import SimpleVectorStore
+from llama_index.embeddings.fastembed import FastEmbedEmbedding
+
 import qdrant_client
 
 
 class Indexer:
 
     def __init__(self):
-    
-        #initialize local embedding model
-        self.local_embed = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
 
+        #initialize local embedding model
+        self.local_embed = FastEmbedEmbedding(model_name="BAAI/bge-small-en-v1.5")
+        #self.local_embed = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
+        
         # Initialize the Qdrant client
         self.client = qdrant_client.QdrantClient(url="http://qdrant:6333")
 

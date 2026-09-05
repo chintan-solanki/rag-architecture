@@ -23,7 +23,7 @@ from helpers.indexer import Indexer, IndexDocument, IndexChunk
 from llama_index.core import StorageContext, VectorStoreIndex
 from llama_index.core.agent.workflow import FunctionAgent
 from llama_index.llms.openai import OpenAI
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+
 
 print('ingestion worker up...')
 

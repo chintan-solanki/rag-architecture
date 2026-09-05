@@ -68,12 +68,16 @@ services:
   #       target: /app/staging
 
   ingestion:
-    build: .
+    build:
+      context: .
+      dockerfile: ingestion/Dockerfile    
     container_name: rag-ingestion
-    command: python ingestion/workers/ingestion.py
+    command: python src/workers/ingestion.py
     depends_on:
       #- kafka
       - qdrant
+    env_file:
+      - ./.env
     volumes:
       - type: bind
         source: ./staging #points to rag-architecture/staging

@@ -1,0 +1,29 @@
+[project]
+name = "rag-architecture-ingestion"
+version = "0.1.0"
+description = "Ingestion pipeline for RAG architecture"
+authors = [
+    { name = "chintan-solanki", email = "chinsol.8973@gmail.com" }
+]
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "python-dotenv>=1.0",
+    "kafka-python>=2.2.15",
+    "watchdog>=6.0.0",
+    "fastembed>=0.8.0",
+    "llama-index>=0.14.24",
+    "llama-index-readers-file>=0.6.0",
+    "llama-index-vector-stores-qdrant>=0.10.3",
+    "markdown-it-py>=4.2.0",
+    "pymupdf4llm>=1.28.2",
+    "qdrant-client>=1.19.0",
+    "llama-index-embeddings-fastembed>=0.7.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.3,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv]
+package = false
+
