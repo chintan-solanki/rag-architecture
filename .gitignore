@@ -11,3 +11,7 @@ wheels/
 
 #env
 .env
+
+#database and qdrant files
+/database/*
+/qdrant_data/*

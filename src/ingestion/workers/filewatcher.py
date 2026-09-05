@@ -7,6 +7,7 @@ import shutil
 import uuid
 from pathlib import Path
 import sys
+import time
 
 #add ingestion directory to sys.path so we can import modules from it
 INGESTION_DIR = Path(__file__).resolve().parent.parent
@@ -14,8 +15,8 @@ INGESTION_DIR = Path(__file__).resolve().parent.parent
 if str(INGESTION_DIR) not in sys.path:
     sys.path.insert(0, str(INGESTION_DIR))
 
-from watcher.stablewatcher import StableWatcher
-from kafkacommon.kafkahelper import KafkaHelper
+from helpers.stablewatcher import StableWatcher
+from helpers.kafkahelper import KafkaHelper
 
 # -----------------------------------------------------------------------------
 # Configuration
@@ -62,28 +63,40 @@ def handle_stable_file(source: Path) -> None:
     #destination = make_unique_destination(source)
     destination = FETCHED_DIR / f"{source.stem}_{doc_id}{source.suffix}"
 
+    copied, ignored = False, False
+
+    #copy from incoming to fetched directory
     try:
-        if not str(source).endswith(':zone.identifier'): #skip copying zone identifier files (wsl)
+        if not source.suffix == '.Identifier': #skip copying zone identifier files (wsl)
             print("Copying %s -> %s", source, destination)
             shutil.copy2(source, destination)
+            copied = True
+        else:
+            ignored = True
     except Exception:
         print("Failed to copy %s", source)
         return
 
-    #publish kafka event for the copied file
-    publish_kafka_event(destination, doc_id)
+    #publish kafka event for the copied file if it was copied and not ignored
+    if not ignored and copied:
+        try:
+            #publish kafka event for the copied file
+            publish_kafka_event(destination, doc_id)
+        except Exception:
+            print("Failed to publish kafka event for %s", destination)
+            return
 
-    try:
-        #delete the source file after copying
-        source.unlink() 
-    except Exception:
-        print(
-            "Event published successfully, but failed to delete source %s",
-            source,
-        )
-        return
+    #delete the source file after copying or if it was ignored (e.g., zone identifier files)
+    if ignored or copied:
+        try:
+            source.unlink() 
+        except Exception:
+            print(
+                "Failed to delete source %s",
+                source,
+            )
+            return
 
-    print("Processed successfully: %s", source.name)
 
 
 # -----------------------------------------------------------------------------
@@ -106,9 +119,8 @@ def main() -> None:
         # Watcher owns its own background threads. Keep this application
         # process alive until interrupted.
         while True:
-            # A simple synchronous service loop is sufficient here.
-            # This can later be replaced by a more explicit shutdown mechanism.
-            import time
+            # A simple synchronous service loop is sufficient for now, can be replaced
+            # by a more sophisticated event loop or signal handling if needed.
             time.sleep(60)
 
     except KeyboardInterrupt:

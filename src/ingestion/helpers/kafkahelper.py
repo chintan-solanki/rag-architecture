@@ -32,7 +32,7 @@ class KafkaHelper:
                 time.sleep(2**attempt)  # exp Wait before retrying
 
         print("All attempts to send event failed.")
-        #todo: add logic to push this to a dead letter topic to some other log to avoid losing the event
+        #todo: add logic to push this to a dead letter topic or to some other durable log to avoid losing the event
 
 
     def getconsumer(self, topic, group_id):
