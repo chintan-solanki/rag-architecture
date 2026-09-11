@@ -5,7 +5,7 @@ from collections import defaultdict
 
 import pymupdf4llm
 from markdown_it import MarkdownIt
-from llama_index.core import Document
+from pathlib import Path
 
 
 @dataclass
@@ -23,7 +23,6 @@ class SectionMetadata:
     file_author: str = ''
     file_length: int = 0 #no of characters in pdf file
     file_total_pages: int = 0 #total pages in the parent document
-    file_id: str = ''
     
 @dataclass
 class MarkdownSection:
@@ -52,13 +51,18 @@ class PdfParser:
     '''
     returns pdf file level metadata and page_offsets (mapping between pages and their start character positions)
     '''
-    def _get_pdf_metadata(self, pages):
-        metadata = defaultdict(None)
-        keys = ['file_title', 'file_author', 'file_path', 'file_page_count']
-        if pages and 'metadata' in pages[0]:
-            obj = pages[0]['metadata']
-            metadata = defaultdict(None, {key : obj[key] for key in keys if key in obj})
+    def _get_pdf_metadata(self, file_path_str, pages):
 
+        metadata = defaultdict(None)
+
+        if file_path_str and (file_path := Path(file_path_str)).exists():
+            metadata['file_name'] = file_path.name
+            metadata['file_path'] = str(file_path)
+
+        src_obj = pages[0]['metadata']
+        metadata['file_author'] = src_obj.get('author', '')
+        metadata['file_title'] = src_obj.get('title', '')
+        metadata['file_page_count'] = src_obj.get('page_count', 0)
         metadata['file_length'] = sum((len(page['text']) for page in pages))
 
         page_offsets = self._build_page_offsets(pages)
@@ -145,13 +149,14 @@ class PdfParser:
                         section_start_char_idx = start_idx,
                         section_end_char_idx = end_idx,
 
-                        file_title=file_metadata.get('title', ''), 
-                        file_author=file_metadata.get('author', ''), 
+                        file_name=file_metadata.get('file_name', ''), 
                         file_path=file_metadata.get('file_path', ''), 
-                        file_total_pages=file_metadata.get('page_count', ''), 
-                        file_length=len(markdown)
+                        file_title=file_metadata.get('file_title', ''), 
+                        file_author=file_metadata.get('file_author', ''),
+                        file_total_pages=file_metadata.get('file_total_pages', ''), 
+                        file_length=len(markdown),
                         
-                        )
+                    )
                 )
             )
             
@@ -209,10 +214,11 @@ class PdfParser:
         pages = pymupdf4llm.to_markdown(file_path, page_chunks=True)
         full_md = ''.join([page['text'] for page in pages])
 
-        file_metadata, file_page_offsets = self._get_pdf_metadata(pages)
+        file_metadata, file_page_offsets = self._get_pdf_metadata(file_path, pages)
 
         #parse the markdown to find logical sections (treating h2 as the cut_level)
         hierarchical_sections = self._markdown_sections(full_md, file_metadata)
         sections = self._get_flat_sections(hierarchical_sections, cut_level=cut_level)
 
         return file_metadata, file_page_offsets, sections
+

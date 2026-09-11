@@ -39,9 +39,9 @@ def make_unique_destination(source: Path) -> Path:
         / f"{source.stem}_{uuid.uuid4().hex}{source.suffix}"
     )
 
-def publish_kafka_event(file_path, document_id):
+def publish_kafka_event(file_path, file_id):
     event = {
-        "document_id": document_id,
+        "file_id": file_id,
         "source_type": "filewatcher",
         "source_path": str(file_path),
         "file_type": file_path.suffix,
@@ -57,11 +57,11 @@ def handle_stable_file(source: Path) -> None:
 
     FETCHED_DIR.mkdir(parents=True, exist_ok=True)
 
-    #create a unique document id for the file
-    doc_id = str(uuid.uuid4().hex)
+    #create a unique file id for the file
+    file_id = str(uuid.uuid4().hex)
 
     #destination = make_unique_destination(source)
-    destination = FETCHED_DIR / f"{source.stem}_{doc_id}{source.suffix}"
+    destination = FETCHED_DIR / f"{source.stem}_{file_id}{source.suffix}"
 
     copied, ignored = False, False
 
@@ -81,7 +81,7 @@ def handle_stable_file(source: Path) -> None:
     if not ignored and copied:
         try:
             #publish kafka event for the copied file
-            publish_kafka_event(destination, doc_id)
+            publish_kafka_event(destination, file_id)
         except Exception:
             print("Failed to publish kafka event for %s", destination)
             return

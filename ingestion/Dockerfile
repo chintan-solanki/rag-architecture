@@ -15,4 +15,9 @@ RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
     UV_CONCURRENT_INSTALLS=2 \
     uv sync --frozen 
 
+ENV NLTK_DATA=/app/nltk_data
+
+RUN mkdir -p "$NLTK_DATA" && \
+    uv run python -c "import nltk; nltk.download('punkt', download_dir='$NLTK_DATA')"
+
 COPY ingestion/src ./src

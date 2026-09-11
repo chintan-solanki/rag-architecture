@@ -35,7 +35,7 @@ class KafkaHelper:
         #todo: add logic to push this to a dead letter topic or to some other durable log to avoid losing the event
 
 
-    def getconsumer(self, topic, group_id):
+    def getconsumer(self, topic, group_id) -> KafkaConsumer:
         consumer = (KafkaConsumer(
             topic,
             bootstrap_servers=self.bootstrap_servers,

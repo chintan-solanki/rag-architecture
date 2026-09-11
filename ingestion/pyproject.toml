@@ -24,6 +24,22 @@ dependencies = [
 requires = ["uv_build>=0.12.3,<0.13.0"]
 build-backend = "uv_build"
 
+[dependency-groups]
+dev = [
+    "dotenv>=0.9.9",
+    "fastembed>=0.8.0",
+    "ipykernel>=7.3.0",
+    "llama-index>=0.14.24",
+    "llama-index-readers-file>=0.6.0",
+    "llama-index-vector-stores-qdrant>=0.10.3",
+    "markdown-it-py>=4.2.0",
+    "pymupdf>=1.28.2",
+    "pymupdf4llm>=1.28.2",
+    "qdrant-client>=1.19.0",
+    "llama-index-embeddings-fastembed>=0.7.0",
+]
+
+
 [tool.uv]
 package = false
 
