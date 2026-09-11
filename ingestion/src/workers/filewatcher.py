@@ -10,11 +10,15 @@ import sys
 import time
 
 #add ingestion directory to sys.path so we can import modules from it
-INGESTION_DIR = Path(__file__).resolve().parent.parent
+SRC_DIR = Path(__file__).resolve().parent.parent
+ROOT_DIR = SRC_DIR.parent.parent
 
-if str(INGESTION_DIR) not in sys.path:
-    sys.path.insert(0, str(INGESTION_DIR))
+print(f'ROOT_DIR = {ROOT_DIR}, SRC_DIR={SRC_DIR}')
 
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+from helpers.configservice import load_config
 from helpers.stablewatcher import StableWatcher
 from helpers.kafkahelper import KafkaHelper
 
@@ -22,10 +26,20 @@ from helpers.kafkahelper import KafkaHelper
 # Configuration
 # -----------------------------------------------------------------------------
 
-INCOMING_DIR = Path(os.getenv("INCOMING_DIR", "/app/staging/incoming"))
-FETCHED_DIR = Path(os.getenv("FETCHED_DIR", "/app/staging/fetched"))
-kafka_helper = KafkaHelper()
+config = load_config()['filewatcher']
 
+INCOMING_DIR = ROOT_DIR / config['incoming_dir_rel_path']
+FETCHED_DIR = ROOT_DIR / config['fetched_dir_rel_path']
+STABLE_CHECKS = config['stable_checks']
+CHECK_INTERVAL = config['check_interval']
+INITIAL_DELAY = config['initial_delay']
+MAX_WORKERS = config['max_workers']
+
+# -----------------------------------------------------------------------------
+# Configuration
+# -----------------------------------------------------------------------------
+
+kafka_helper = KafkaHelper()
 
 def make_unique_destination(source: Path) -> Path:
     
@@ -107,10 +121,10 @@ def main() -> None:
     watcher = StableWatcher(
         INCOMING_DIR,
         handle_stable_file,
-        stable_checks=3,
-        check_interval=1.0,
-        initial_delay=1.0,
-        max_workers=4,
+        stable_checks=STABLE_CHECKS,
+        check_interval=CHECK_INTERVAL,
+        initial_delay=INITIAL_DELAY,
+        max_workers=MAX_WORKERS,
     )
 
     watcher.start()

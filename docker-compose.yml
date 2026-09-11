@@ -66,10 +66,13 @@ services:
       context: .
       dockerfile: ingestion/Dockerfile    
     container_name: rag-filewatcher
-    command: python src/workers/filewatcher.py
+    command: python ingestion/src/workers/filewatcher.py
     depends_on:
       kafka:
         condition: service_healthy
+    configs:
+      - source: ingestion_config
+        target: /app/ingestion/config/config.yml
     volumes:
       - type: bind
         source: ./staging #points to rag-architecture/staging
@@ -80,14 +83,22 @@ services:
       context: .
       dockerfile: ingestion/Dockerfile    
     container_name: rag-ingestion
-    command: python src/workers/ingestion.py
+    command: python ingestion/src/workers/ingestion.py
     depends_on:
       kafka:
         condition: service_healthy
       qdrant-init:
           condition: service_completed_successfully
-    env_file:
-      - ./.env
+    environment:
+      - HF_TOKEN=${HF_TOKEN}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DB_REL_PATH=${DB_REL_PATH}
+      - QDRANT_URL=${QDRANT_URL}
+    
+    configs:
+      - source: ingestion_config
+        target: /app/ingestion/config/config.yml
+
     volumes:
       - type: bind
         source: ./staging #points to rag-architecture/staging
@@ -98,4 +109,10 @@ services:
       
 volumes:
   kafka_data:
+
+configs:
+  ingestion_config:
+    file: ./ingestion/config/config.yml
+
+
   

@@ -18,21 +18,8 @@ class DocumentHasher:
         if chunk_size <= 0:
             raise ValueError("chunk_size must be greater than zero")
 
-        try:
-            hashlib.new(algorithm)
-        except ValueError as exc:
-            raise ValueError(f"unsupported hash algorithm: {algorithm}") from exc
-
         self.algorithm = algorithm
         self.chunk_size = chunk_size
-
-        if self.chunk_size <= 0:
-            raise ValueError("chunk_size must be > zero")
-
-        try:
-            self.digest = hashlib.new(algorithm)
-        except ValueError as exc:
-            raise ValueError(f"unsupported hash algorithm: {algorithm}") from exc
 
     
     def hash_document(self, document: bytes | bytearray | PathLike | BinaryIO
@@ -44,22 +31,27 @@ class DocumentHasher:
         Streams are read from their current position and are not closed.
         """    
 
+        try:
+            digest = hashlib.new(self.algorithm)
+        except ValueError as exc:
+            raise ValueError(f"unsupported hash algorithm: {self.algorithm}") from exc
+        
         if isinstance(document, (bytes, bytearray)):
-            self.digest.update(document)
+            digest.update(document)
         elif isinstance(document, (str, Path)):
             with open(document, "rb") as f:
-                self._update_digest(f)
+                self._update_digest(digest, f)
         elif hasattr(document, "read"):
-            self._update_digest(document)
+            self._update_digest(digest, document)
         else:
             raise TypeError("document must be bytes (bytes or bytearray), a file path (str or Path), or a binary stream")
 
-        return self.digest.hexdigest()
+        return digest.hexdigest()
 
 
-    def _update_digest(self, stream: BinaryIO) -> None:
+    def _update_digest(self, digest: any, stream: BinaryIO) -> None:
         """Read a binary stream in chunks and update the digest."""
         while chunk := stream.read(self.chunk_size):
             if not isinstance(chunk, bytes):
                 raise TypeError("document stream must be opened in binary mode")
-            self.digest.update(chunk)  
+            digest.update(chunk)  

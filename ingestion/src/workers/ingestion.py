@@ -19,24 +19,48 @@ def timer(label):
 load_dotenv()
 
 #add ingestion directory to sys.path so we can import modules from it
-INGESTION_DIR = Path(__file__).resolve().parent.parent
+SRC_DIR = Path(__file__).resolve().parent.parent
+ROOT_DIR = SRC_DIR.parent.parent
 
-if str(INGESTION_DIR) not in sys.path:
-    sys.path.insert(0, str(INGESTION_DIR))
+print(f'ROOT_DIR = {ROOT_DIR}, SRC_DIR={SRC_DIR}')
+
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
 from helpers.hasher import DocumentHasher
 from helpers.dbrepository import FileRepository
 from helpers.pdfparser import PdfParser, MarkdownSection, SectionMetadata
 from helpers.indexer import Indexer, IndexDocument, IndexChunk
 from helpers.kafkahelper import KafkaHelper
+from helpers.configservice import load_config
 from kafka import KafkaConsumer
 
 print('ingestion worker up...')
 
+#load app specific config 
+config = load_config()['ingestion']
+KAFKA_SUBSCRIBE_TOPIC = config['kafka_subscribe_topic']
+KAFKA_SUBSCRIBE_CONSUMER_GROUP = config['kafka_subscribe_consumer_group']
+QDRANT_COLLECTION = config['qdrant_collection']
+FAST_EMBEDDING_MODEL = config['fast_embedding_model']
+
+#load env config
+DB_PATH = str(ROOT_DIR / os.getenv('DB_REL_PATH'))
+QDRANT_URL = os.getenv('QDRANT_URL')
+
 hasher = DocumentHasher()
-file_repository = FileRepository()
+file_repository = FileRepository(db_path=DB_PATH)
 pdf_parser = PdfParser()
-indexer = Indexer()
+indexer = Indexer(qdrant_url=QDRANT_URL, collection_name=QDRANT_COLLECTION, fast_embedding_name=FAST_EMBEDDING_MODEL)
+
+kafkahelper = KafkaHelper()
+kafka_consumer = kafkahelper.getconsumer(KAFKA_SUBSCRIBE_TOPIC, KAFKA_SUBSCRIBE_CONSUMER_GROUP)
+
+def kafka_commit():
+    try:
+        kafka_consumer.commit()
+    except Exception as excp:
+        print('error committing message')
 
 '''
 This function enriches the chunk with the following citation data
@@ -62,23 +86,14 @@ def enrich_chunk_with_citation_data(chunk: IndexChunk, metadata: dict, page_offs
 
     return chunk 
 
-kafkahelper = KafkaHelper()
-kafka_consumer = kafkahelper.getconsumer("document_fetched", "ingestion_worker_group")
-
-def kafka_commit():
-    try:
-        kafka_consumer.commit()
-    except Exception as excp:
-        print('error committing message')
-
-
 for message in kafka_consumer:
 
-    print('message found from kafka..')
     message_value = message.value
 
     file_id = message_value.get("file_id")
     source_path = message_value.get("source_path")
+
+    print(f'message found from kafka.. file_id:{file_id}, source_path:{source_path}')
 
     #check if the file exists at the source path, if not log and continue to next message
     if not source_path or not (file_path := Path(source_path)).exists():
@@ -86,15 +101,16 @@ for message in kafka_consumer:
         kafka_commit() #kakfka ack here to avoid reprocessing this message
         continue
 
-    with timer('check file hash...'):
-        #compute doc hash and check if it already exists in the database.
-        file_hash = hasher.hash_document(file_path)
-        print(f'File ID: {file_id}, Source Path: {source_path} has hash {file_hash}')
+    #compute doc hash and check if it already exists in the database.
+    file_hash = hasher.hash_document(file_path)
+    print(f'File ID: {file_id}, Source Path: {source_path} has hash {file_hash}')
 
-        if file_hash and (existing_file := file_repository.find_by_hash(file_hash)):
-            print(f"File ID: {file_id}, File Hash: {file_hash} already exists in the database with id {existing_file['file_id']}. Skipping ingestion.")
-            kafka_commit() #kakfka ack here to skip this message
-            continue
+    if file_hash and (existing_file := file_repository.find_by_hash(file_hash)):
+        print(f"File ID: {file_id}, File Hash: {file_hash} already exists in the database with id {existing_file['file_id']}. Skipping ingestion.")
+        kafka_commit() #kakfka ack here to skip this message
+        continue
+    else:
+        print(existing_file)
 
     with timer('create pdf sections...'):
         # get list of sections from the pdf file. We then treat each section as a separate document and index it.

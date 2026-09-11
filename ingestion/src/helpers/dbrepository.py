@@ -2,9 +2,8 @@ import json
 import sqlite3
 
 class FileRepository:
-    def __init__(self, db_path: str = None):
-        if db_path is None:
-            db_path = "/app/database/rag.db"
+    def __init__(self, db_path):
+        print(f'db_path = {db_path}')
 
         self.db_path = db_path
         self.create_schema(self.db_path)

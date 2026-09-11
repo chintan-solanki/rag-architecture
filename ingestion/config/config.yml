@@ -1,0 +1,17 @@
+filewatcher:
+  kafka_publish_topic: 'document_fetched'
+  incoming_dir_rel_path: 'staging/incoming'
+  fetched_dir_rel_path: 'staging/fetched'
+
+  stable_checks: 3
+  check_interval: 1.0
+  initial_delay: 1.0
+  max_workers: 4
+
+ingestion:
+  kafka_subscribe_topic: 'document_fetched'
+  kafka_subscribe_consumer_group: 'ingestion_worker_group'
+  qdrant_collection: 'test_collection2'
+  fast_embedding_model: 'BAAI/bge-small-en-v1.5'
+
+

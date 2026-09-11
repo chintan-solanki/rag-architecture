@@ -38,12 +38,12 @@ from qdrant_client.http import models
 
 class Indexer:
 
-    def __init__(self, qdrant_url='http://qdrant:6333', collection_name='test_collection2'):
+    def __init__(self, qdrant_url, collection_name, fast_embedding_name):
 
         self._collection_name = collection_name
 
         #initialize local embedding model
-        self.local_embed = FastEmbedEmbedding(model_name="BAAI/bge-small-en-v1.5")
+        self.local_embed = FastEmbedEmbedding(model_name=fast_embedding_name)
         
         # Initialize the Qdrant client
         self.client = qdrant_client.QdrantClient(url=qdrant_url)
