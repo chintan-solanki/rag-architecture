@@ -21,6 +21,7 @@ load_dotenv()
 #add ingestion directory to sys.path so we can import modules from it
 SRC_DIR = Path(__file__).resolve().parent.parent
 ROOT_DIR = SRC_DIR.parent.parent
+MODEL_DIR = ROOT_DIR / 'models'
 
 print(f'ROOT_DIR = {ROOT_DIR}, SRC_DIR={SRC_DIR}')
 
@@ -43,15 +44,20 @@ KAFKA_SUBSCRIBE_TOPIC = config['kafka_subscribe_topic']
 KAFKA_SUBSCRIBE_CONSUMER_GROUP = config['kafka_subscribe_consumer_group']
 QDRANT_COLLECTION = config['qdrant_collection']
 FAST_EMBEDDING_MODEL = config['fast_embedding_model']
-
-#load env config
+EMBEDDING_MODEL_CACHE_DIR = MODEL_DIR / 'embeddings'
 DB_PATH = str(ROOT_DIR / os.getenv('DB_REL_PATH'))
 QDRANT_URL = os.getenv('QDRANT_URL')
+
 
 hasher = DocumentHasher()
 file_repository = FileRepository(db_path=DB_PATH)
 pdf_parser = PdfParser()
-indexer = Indexer(qdrant_url=QDRANT_URL, collection_name=QDRANT_COLLECTION, fast_embedding_name=FAST_EMBEDDING_MODEL)
+indexer = Indexer(
+    qdrant_url=QDRANT_URL, 
+    collection_name=QDRANT_COLLECTION, 
+    fast_embedding_name=FAST_EMBEDDING_MODEL,
+    embedding_cache_dir=str(EMBEDDING_MODEL_CACHE_DIR)
+    )
 
 kafkahelper = KafkaHelper()
 kafka_consumer = kafkahelper.getconsumer(KAFKA_SUBSCRIBE_TOPIC, KAFKA_SUBSCRIBE_CONSUMER_GROUP)
@@ -109,9 +115,7 @@ for message in kafka_consumer:
         print(f"File ID: {file_id}, File Hash: {file_hash} already exists in the database with id {existing_file['file_id']}. Skipping ingestion.")
         kafka_commit() #kakfka ack here to skip this message
         continue
-    else:
-        print(existing_file)
-
+    
     with timer('create pdf sections...'):
         # get list of sections from the pdf file. We then treat each section as a separate document and index it.
         file_metadata, page_offsets, sections = pdf_parser.parse(source_path)

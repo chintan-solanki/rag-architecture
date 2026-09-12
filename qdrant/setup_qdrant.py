@@ -3,10 +3,15 @@ import time
 
 from qdrant_client import QdrantClient
 from qdrant_client.http.exceptions import UnexpectedResponse
-
+from qdrant_client.models import (
+    VectorParams,
+    SparseVectorParams,
+    Distance,
+)
 
 QDRANT_HOST, QDRANT_PORT = "qdrant", 6333
-COLLECTION_NAME = "test_collection2"
+DENSE_COLLECTION_NAME = "test_collection"
+HYBRID_COLLECTION_NAME = "hybrid_collection"
 VECTOR_SIZE = 384
 DISTANCE = "Cosine"
 
@@ -14,21 +19,35 @@ MAX_WAIT_SECONDS = 60
 RETRY_INTERVAL_SECONDS = 2
 
 def create_collection_if_missing(client: QdrantClient) -> None:
-    if client.collection_exists(COLLECTION_NAME):
-        print(f"Collection '{COLLECTION_NAME}' already exists. We are good!")
-        return
+    if client.collection_exists(DENSE_COLLECTION_NAME):
+        print(f"Collection '{DENSE_COLLECTION_NAME}' already exists. We are good!")
+    else:
+        print(f"Creating collection '{DENSE_COLLECTION_NAME}'...")
 
-    print(f"Creating collection '{COLLECTION_NAME}'...")
+        client.create_collection(
+            collection_name=DENSE_COLLECTION_NAME,
+            vectors_config={
+                "size": VECTOR_SIZE,
+                "distance": DISTANCE,
+            },
+        )
 
-    client.create_collection(
-        collection_name=COLLECTION_NAME,
-        vectors_config={
-            "size": VECTOR_SIZE,
-            "distance": DISTANCE,
-        },
-    )
-
-    print(f"Collection '{COLLECTION_NAME}' created.")
+    if client.collection_exists(HYBRID_COLLECTION_NAME):
+        print(f"Collection '{HYBRID_COLLECTION_NAME}' already exists. We are good!")
+    else:
+        client.create_collection(
+            collection_name=HYBRID_COLLECTION_NAME,
+            vectors_config={
+                "text-dense": VectorParams(
+                    size=VECTOR_SIZE,
+                    distance=DISTANCE,
+                )
+            },
+            sparse_vectors_config={
+                "text-sparse-new": SparseVectorParams()
+            }
+        )
+        print(f"Collection '{HYBRID_COLLECTION_NAME}' created.")
 
 
 def main() -> int:

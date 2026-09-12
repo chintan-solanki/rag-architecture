@@ -101,6 +101,9 @@ services:
 
     volumes:
       - type: bind
+        source: ./models #points to rag-architecture/models
+        target: /app/models
+      - type: bind
         source: ./staging #points to rag-architecture/staging
         target: /app/staging
       - type: bind

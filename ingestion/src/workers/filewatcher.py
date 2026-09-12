@@ -28,12 +28,14 @@ from helpers.kafkahelper import KafkaHelper
 
 config = load_config()['filewatcher']
 
+
 INCOMING_DIR = ROOT_DIR / config['incoming_dir_rel_path']
 FETCHED_DIR = ROOT_DIR / config['fetched_dir_rel_path']
 STABLE_CHECKS = config['stable_checks']
 CHECK_INTERVAL = config['check_interval']
 INITIAL_DELAY = config['initial_delay']
 MAX_WORKERS = config['max_workers']
+kAFKA_PUBLISH_TOPIC = config['kafka_publish_topic']
 
 # -----------------------------------------------------------------------------
 # Configuration
@@ -61,7 +63,7 @@ def publish_kafka_event(file_path, file_id):
         "file_type": file_path.suffix,
     }
     
-    kafka_helper.send_event("document_fetched", event)
+    kafka_helper.send_event(kAFKA_PUBLISH_TOPIC, event)
 
 def handle_stable_file(source: Path) -> None:
     

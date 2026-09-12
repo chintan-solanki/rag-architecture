@@ -24,7 +24,7 @@ class IndexDocument:
 Returns chunk object for a given llamaindex chunk
 '''
 
-from llama_index.core import StorageContext, VectorStoreIndex
+from llama_index.core import StorageContext, VectorStoreIndex, Settings
 from llama_index.core.schema import Document, NodeRelationship
 from llama_index.core.node_parser import SentenceSplitter
 
@@ -38,19 +38,29 @@ from qdrant_client.http import models
 
 class Indexer:
 
-    def __init__(self, qdrant_url, collection_name, fast_embedding_name):
+    def __init__(self, qdrant_url, collection_name, fast_embedding_name, embedding_cache_dir):
 
         self._collection_name = collection_name
+        print(f'collection name: {collection_name}')
 
+        print(f'start loading fastembedding | {datetime.now()}')
         #initialize local embedding model
-        self.local_embed = FastEmbedEmbedding(model_name=fast_embedding_name)
+        self.local_embed = FastEmbedEmbedding(model_name=fast_embedding_name, cache_dir=embedding_cache_dir)
+        Settings.embed_model = self.local_embed
+        print(f'fastembedding loaded | {datetime.now()}')
         
         # Initialize the Qdrant client
         self.client = qdrant_client.QdrantClient(url=qdrant_url)
 
         #initiaalize qdrant vector store
         
-        self.vector_store = QdrantVectorStore(client=self.client, collection_name=self._collection_name)
+        #self.vector_store = QdrantVectorStore(client=self.client, collection_name=self._collection_name)
+        self.vector_store = QdrantVectorStore(
+            client=self.client, 
+            collection_name=self._collection_name,
+            enable_hybrid=True,
+            batch_size=64
+        )
 
         #initialize storage_context over the vector storage
         self.storage_context = StorageContext.from_defaults(vector_store=self.vector_store)
@@ -156,12 +166,18 @@ class Indexer:
             self._update_node_metadata(node, chunk)
             chunks.append(chunk)
 
-        #build index over nodes
-        index = VectorStoreIndex(
-            nodes, 
-            embed_model=self.local_embed, 
-            storage_context=self.storage_context
-            )
+        batch_size = 8
+        start = 0
+        while start < len(nodes):
+            end = min(len(nodes), start + batch_size)
+            print(f'indexing batch[{start}, {end}]')
+            #build index over nodes
+            index = VectorStoreIndex(
+                nodes[start: end], 
+                embed_model=self.local_embed, 
+                storage_context=self.storage_context
+                )
+            start = end
 
         return index
 

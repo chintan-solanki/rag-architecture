@@ -11,7 +11,8 @@ filewatcher:
 ingestion:
   kafka_subscribe_topic: 'document_fetched'
   kafka_subscribe_consumer_group: 'ingestion_worker_group'
-  qdrant_collection: 'test_collection2'
+  #qdrant_collection: 'test_collection2'
+  qdrant_collection: 'hybrid_collection'
   fast_embedding_model: 'BAAI/bge-small-en-v1.5'
 
 

@@ -13,6 +13,7 @@ wheels/
 .env
 .nltk_data
 
-#database and qdrant files
+#database, qdrant, and models 
 /database/*
 /qdrant/storage/*
+/models/*
