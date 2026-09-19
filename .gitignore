@@ -16,4 +16,6 @@ wheels/
 #database, qdrant, and models 
 /database/*
 /qdrant/storage/*
-/models/*
+/.models/*
+/staging/incoming
+/staging/fetched

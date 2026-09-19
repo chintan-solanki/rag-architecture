@@ -21,7 +21,7 @@ load_dotenv()
 #add ingestion directory to sys.path so we can import modules from it
 SRC_DIR = Path(__file__).resolve().parent.parent
 ROOT_DIR = SRC_DIR.parent.parent
-MODEL_DIR = ROOT_DIR / 'models'
+MODEL_DIR = ROOT_DIR / '.models'
 
 print(f'ROOT_DIR = {ROOT_DIR}, SRC_DIR={SRC_DIR}')
 
