@@ -1,13 +1,26 @@
 from fastapi import FastAPI
+from .routers import documents_router, query_router
+from .telemetry import init_telemetry
 
-app = FastAPI()
+def create_app() -> FastAPI:
+    #initialize telemetry
+    init_telemetry()
+
+    application = FastAPI(title="RAG Service")
+    application.include_router(query_router, prefix="/api/v1")
+    application.include_router(documents_router, prefix="/api/v1")
+
+    
+
+    @application.get("/")
+    def root():
+        return {"service": "ragservice", "status": "ok"}
+
+    @application.get("/health")
+    def health():
+        return {"status": "ok"}
+
+    return application
 
 
-@app.get("/")
-def read_root():
-    return "hello"
-
-
-@app.get("/items/{item_id}")
-def read_item(item_id: int, q: str | None = None):
-    return {"item_id": item_id, "q": q}
+app = create_app()

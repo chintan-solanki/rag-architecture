@@ -60,6 +60,16 @@ services:
       qdrant:
         condition: service_started
 
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    ports:
+      - "16686:16686"  # Jaeger Web UI
+      - "4317:4317"    # OpenTelemetry Protocol (OTLP) over gRPC
+      - "4318:4318"    # OpenTelemetry Protocol (OTLP) over HTTP
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true # Enables OpenTelemetry receivers
+    restart: unless-stopped
   
   filewatcher:
     build:
@@ -76,6 +86,23 @@ services:
     volumes:
       - type: bind
         source: ./staging #points to rag-architecture/staging
+        target: /app/staging
+
+  downloader:
+    build:
+      context: .
+      dockerfile: ingestion/Dockerfile
+    container_name: rag-downloader
+    command: python ingestion/src/workers/downloader.py
+    depends_on:
+      kafka:
+        condition: service_healthy
+    configs:
+      - source: ingestion_config
+        target: /app/ingestion/config/config.yml
+    volumes:
+      - type: bind
+        source: ./staging
         target: /app/staging
 
   ingestion:
@@ -109,6 +136,35 @@ services:
       - type: bind
         source: ./database #points to rag-architecture/database/sqlite
         target: /app/database
+
+  ragservice:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: rag-service
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - HF_TOKEN=${HF_TOKEN}
+      - QDRANT_URL=${QDRANT_URL:-http://qdrant:6333}
+    depends_on:
+      kafka:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+
+    configs:
+      - source: api_config
+        target: /app/api/config/config.yml
+
+    volumes:
+      - type: bind
+        source: ./staging
+        target: /app/staging
+      - type: bind
+        source: ./.models #points to rag-architecture/.models
+        target: /app/.models
       
 volumes:
   kafka_data:
@@ -116,6 +172,8 @@ volumes:
 configs:
   ingestion_config:
     file: ./ingestion/config/config.yml
+  api_config:
+    file: ./api/config/config.yml
 
 
   

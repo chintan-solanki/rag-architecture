@@ -10,6 +10,17 @@ dependencies = [
     "python-dotenv>=1.0",
     "kafka-python>=2.2.15",
     "fastapi[standard]>=0.141.1",
+    "python-multipart>=0.0.20",
+    "llama-index>=0.14.24",
+    "llama-index-vector-stores-qdrant>=0.10.3",
+    "llama-index-llms-openai>=0.6.0",
+    "fastembed>=0.8.0",
+    "llama-index-embeddings-fastembed>=0.7.0",
+    "qdrant-client>=1.15.0",
+    "pyyaml>=6.0",
+    "opentelemetry-api>=1.27.0",
+    "opentelemetry-sdk>=1.27.0",
+    "opentelemetry-exporter-otlp>=1.44.0",
 ]
 
 [build-system]
@@ -24,4 +35,3 @@ dev = [
 
 [tool.uv]
 package = false
-

@@ -23,6 +23,7 @@ class SectionMetadata:
     file_author: str = ''
     file_length: int = 0 #no of characters in pdf file
     file_total_pages: int = 0 #total pages in the parent document
+    document_id: str = ''
     
 @dataclass
 class MarkdownSection:
@@ -221,4 +222,3 @@ class PdfParser:
         sections = self._get_flat_sections(hierarchical_sections, cut_level=cut_level)
 
         return file_metadata, file_page_offsets, sections
-

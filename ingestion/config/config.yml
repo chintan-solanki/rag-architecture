@@ -8,11 +8,16 @@ filewatcher:
   initial_delay: 1.0
   max_workers: 4
 
+downloader:
+  kafka_subscribe_topic: 'document_download_requested'
+  kafka_subscribe_consumer_group: 'downloader_worker_group'
+  incoming_dir_rel_path: 'staging/incoming'
+  fetched_dir_rel_path: 'staging/fetched'
+
 ingestion:
   kafka_subscribe_topic: 'document_fetched'
   kafka_subscribe_consumer_group: 'ingestion_worker_group'
   #qdrant_collection: 'test_collection2'
-  qdrant_collection: 'hybrid_collection'
+  qdrant_collection: 'hybrid_collection2'
   fast_embedding_model: 'BAAI/bge-small-en-v1.5'
-
 

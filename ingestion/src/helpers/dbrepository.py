@@ -12,7 +12,7 @@ class FileRepository:
         with sqlite3.connect(db_path) as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS files (
-                    file_id TEXT PRIMARY KEY,
+                    document_id TEXT PRIMARY KEY,
                     content_hash TEXT NOT NULL UNIQUE,
                     content_length INTEGER NOT NULL,
                     
@@ -26,7 +26,7 @@ class FileRepository:
         with sqlite3.connect(self.db_path) as conn:
             record = conn.execute(
                 """
-                SELECT file_id, content_length
+                SELECT document_id, content_length
                 FROM files
                 WHERE content_hash = ?
                 """,
@@ -35,13 +35,13 @@ class FileRepository:
 
         if record:
             return {
-                "file_id": record[0],
+                "document_id": record[0],
                 "content_length": record[1],
             }
         
         return None
 
-    def insert_or_ignore(self, file_id, content_hash, content_length, metadata={}):
+    def insert_or_ignore(self, document_id, content_hash, content_length, metadata={}):
 
         record = None
 
@@ -52,11 +52,11 @@ class FileRepository:
             record = conn.execute(
                 """
                 INSERT OR IGNORE INTO files
-                    (file_id, content_hash, content_length, metadata)
+                    (document_id, content_hash, content_length, metadata)
                 VALUES (?, ?, ?, ?)
-                RETURNING file_id;
+                RETURNING document_id;
                 """,
-                (file_id, content_hash, content_length, metadata_str),
+                (document_id, content_hash, content_length, metadata_str),
             ).fetchone()
         
         if record:
@@ -64,22 +64,22 @@ class FileRepository:
 
         return None
 
-    def get_file(self, file_id):
+    def get_file(self, document_id):
 
         record = None
         with sqlite3.connect(self.db_path) as conn:
             record = conn.execute(
                 """
-                SELECT file_id, content_hash, content_length, metadata, created_at
+                SELECT document_id, content_hash, content_length, metadata, created_at
                 FROM files
-                WHERE file_id = ?
+                WHERE document_id = ?
                 """,
-                (file_id,),
+                (document_id,),
             ).fetchone()
 
             if record:
                 return  {
-                    "file_id": record[0],
+                    "document_id": record[0],
                     "content_hash": record[1],
                     "content_length": record[2],
                     "metadata": json.loads(record[3]) if record[3] else {},

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import shutil
 import uuid
 from pathlib import Path
@@ -55,9 +56,12 @@ def make_unique_destination(source: Path) -> Path:
         / f"{source.stem}_{uuid.uuid4().hex}{source.suffix}"
     )
 
-def publish_kafka_event(file_path, file_id):
+DOCUMENT_ID_PREFIX = re.compile(r"^(?P<document_id>[0-9a-fA-F]{32})_.+")
+
+
+def publish_kafka_event(file_path, document_id):
     event = {
-        "file_id": file_id,
+        "document_id": document_id,
         "source_type": "filewatcher",
         "source_path": str(file_path),
         "file_type": file_path.suffix,
@@ -73,12 +77,19 @@ def handle_stable_file(source: Path) -> None:
 
     FETCHED_DIR.mkdir(parents=True, exist_ok=True)
 
-    #create a unique file id for the file
-    file_id = str(uuid.uuid4().hex)
+    # check if the file already contains the document_id
+    match = DOCUMENT_ID_PREFIX.match(source.name)
+    if match:
+        #file came from the api, use the same file name as the destination file name 
+        document_id = match.group("document_id")
+        dest_name = source.name
+    else:
+        #the file was copied in incoming directory manually, generate a random doc id and append to file name
+        document_id = uuid.uuid4().hex
+        dest_name = f'{source.stem}_{document_id}{source.suffix}'
 
-    #destination = make_unique_destination(source)
-    destination = FETCHED_DIR / f"{source.stem}_{file_id}{source.suffix}"
-
+    destination = FETCHED_DIR / dest_name
+    
     copied, ignored = False, False
 
     #copy from incoming to fetched directory
@@ -97,7 +108,7 @@ def handle_stable_file(source: Path) -> None:
     if not ignored and copied:
         try:
             #publish kafka event for the copied file
-            publish_kafka_event(destination, file_id)
+            publish_kafka_event(destination, document_id)
         except Exception:
             print("Failed to publish kafka event for %s", destination)
             return
@@ -149,4 +160,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

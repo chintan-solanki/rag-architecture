@@ -41,7 +41,7 @@ class SectionMetadata:
     file_author: str = ""
     file_length: int = 0
     file_total_pages: int = 0
-    file_id: str = ""
+    document_id: str = ""
 
 
 @dataclass

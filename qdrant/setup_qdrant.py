@@ -11,7 +11,7 @@ from qdrant_client.models import (
 
 QDRANT_HOST, QDRANT_PORT = "qdrant", 6333
 DENSE_COLLECTION_NAME = "test_collection"
-HYBRID_COLLECTION_NAME = "hybrid_collection"
+HYBRID_COLLECTION_NAME = 'hybrid_collection2'
 VECTOR_SIZE = 384
 DISTANCE = "Cosine"
 

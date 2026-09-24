@@ -29,7 +29,6 @@ from llama_index.core.schema import Document, NodeRelationship
 from llama_index.core.node_parser import SentenceSplitter
 
 from llama_index.vector_stores.qdrant import QdrantVectorStore
-from llama_index.core.vector_stores import SimpleVectorStore
 from llama_index.embeddings.fastembed import FastEmbedEmbedding
 
 import qdrant_client
@@ -54,12 +53,12 @@ class Indexer:
 
         #initiaalize qdrant vector store
         
-        #self.vector_store = QdrantVectorStore(client=self.client, collection_name=self._collection_name)
         self.vector_store = QdrantVectorStore(
             client=self.client, 
             collection_name=self._collection_name,
             enable_hybrid=True,
-            batch_size=64
+            batch_size=64,
+            fastembed_sparse_model="Qdrant/bm25" # Forces it to generate BM25 vectors
         )
 
         #initialize storage_context over the vector storage
@@ -122,6 +121,7 @@ class Indexer:
         )
 
         nodes = []
+        index = None
 
         print(f'splitting start: {datetime.now()}')
 

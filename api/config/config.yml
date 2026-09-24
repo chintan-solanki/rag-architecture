@@ -1,0 +1,19 @@
+app:
+  host: 0.0.0.0
+  port: 8000
+qdrant:
+  url: http://qdrant:6333
+  collection: hybrid_collection
+kafka:
+  bootstrap_servers: kafka:9092
+  download_topic: document_download_requested
+staging:
+  incoming_dir: staging/incoming
+  fetched_dir: staging/fetched
+retrieval:
+  top_k: 5
+  fast_embedding_model: 'BAAI/bge-small-en-v1.5'
+  embedding_model_cache_dir_name: 'embeddings'
+llm:
+  model: gpt-4o-mini
+  
