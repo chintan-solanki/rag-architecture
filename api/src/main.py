@@ -13,7 +13,7 @@ def create_app() -> FastAPI:
 
     @application.get("/")
     def root():
-        return {"service": "ragservice", "status": "ok"}
+        return {"service": "ragapi", "status": "ok"}
 
     @application.get("/health")
     def health():

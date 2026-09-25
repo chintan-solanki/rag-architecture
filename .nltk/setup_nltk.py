@@ -8,7 +8,7 @@ def main():
     # 1. Define the safe path under the project root
     # __file__ is scripts/setup_nltk.py, so parent.parent gets the project root
     project_root = Path(__file__).resolve().parent.parent
-    custom_nltk_dir = project_root / ".nltk_data"
+    custom_nltk_dir = project_root / ".nltk/.nltk_data"
     
     # Enforce the environment variable for this runtime session
     os.environ["NLTK_DATA"] = str(custom_nltk_dir)

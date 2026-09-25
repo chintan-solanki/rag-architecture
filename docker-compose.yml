@@ -62,7 +62,7 @@ services:
 
   jaeger:
     image: jaegertracing/all-in-one:latest
-    container_name: jaeger
+    container_name: rag-jaeger
     ports:
       - "16686:16686"  # Jaeger Web UI
       - "4317:4317"    # OpenTelemetry Protocol (OTLP) over gRPC
@@ -137,11 +137,11 @@ services:
         source: ./database #points to rag-architecture/database/sqlite
         target: /app/database
 
-  ragservice:
+  api:
     build:
       context: .
       dockerfile: api/Dockerfile
-    container_name: rag-service
+    container_name: rag-api
     ports:
       - "8000:8000"
     environment:

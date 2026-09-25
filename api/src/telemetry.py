@@ -8,7 +8,7 @@ from opentelemetry.sdk.resources import Resource
 
 def init_telemetry(endpoint="http://jaeger:4317"):
     resource = Resource(attributes={
-        "service.name": "ragservice",
+        "service.name": "ragapi",
         "service.version": "1.0.0"
     })
     
@@ -21,7 +21,7 @@ def init_telemetry(endpoint="http://jaeger:4317"):
     trace.set_tracer_provider(provider)
 
 
-tracer = trace.get_tracer("ragservice")
+tracer = trace.get_tracer("ragapi")
 
 @contextmanager
 def trace_span(name: str, **attributes):

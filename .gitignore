@@ -11,7 +11,7 @@ wheels/
 
 #env
 .env
-.nltk_data
+.nltk/.nltk_data
 
 #database, qdrant, and models 
 /database/*
