@@ -21,6 +21,7 @@ from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.embeddings.fastembed import FastEmbedEmbedding
 import qdrant_client
 from ..models.query import SearchType, Source
+from ..telemetry import trace_span
 
 @dataclass
 class Retrieved:
@@ -85,18 +86,21 @@ class RetrievalService:
         )
 
     def retrieve(self, query: str, search_type: SearchType = SearchType.hybrid, top_k: int | None = None) -> list[Retrieved]:
-        print('retrieve called...')
-        retriever = self._load_index().as_retriever(similarity_top_k=top_k or self.top_k)
-        # LlamaIndex's configured hybrid vector store selects sparse/dense modes
-        # through alpha; keeping the selection here makes the public API explicit.
-        print('index loaded...')
-        if search_type == SearchType.bm25:
-            retriever = self._load_index().as_retriever(similarity_top_k=top_k or self.top_k, vector_store_query_mode="sparse")
-        elif search_type == SearchType.dense:
-            retriever = self._load_index().as_retriever(similarity_top_k=top_k or self.top_k, vector_store_query_mode="default")
-        nodes = retriever.retrieve(query)
-        print(f'retrieved {len(nodes) if nodes else 0} source nodes')
-        return [Retrieved(self.source_from_node(node, i), node) for i, node in enumerate(nodes, 1)]
+        with trace_span('retrieve') as retrieve_span:
+
+            retriever = self._load_index().as_retriever(similarity_top_k=top_k or self.top_k)
+
+            # LlamaIndex's configured hybrid vector store selects sparse/dense modes
+            # through alpha; keeping the selection here makes the public API explicit.
+            
+            if search_type == SearchType.bm25:
+                retriever = self._load_index().as_retriever(similarity_top_k=top_k or self.top_k, vector_store_query_mode="sparse")
+            elif search_type == SearchType.dense:
+                retriever = self._load_index().as_retriever(similarity_top_k=top_k or self.top_k, vector_store_query_mode="default")
+
+            nodes = retriever.retrieve(query)
+            print(f'retrieved {len(nodes) if nodes else 0} source nodes')
+            return [Retrieved(self.source_from_node(node, i), node) for i, node in enumerate(nodes, 1)]
 
     @staticmethod
     def context(sources: list[Source]) -> str:

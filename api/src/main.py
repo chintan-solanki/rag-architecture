@@ -10,7 +10,6 @@ def create_app() -> FastAPI:
     application.include_router(query_router, prefix="/api/v1")
     application.include_router(documents_router, prefix="/api/v1")
 
-    
 
     @application.get("/")
     def root():
