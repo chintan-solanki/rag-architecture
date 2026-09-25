@@ -35,14 +35,14 @@ class QueryService:
             with trace_span('extract citations') as citation_span:
             
                 processor = CitationProcessor()
-                _, ranges = processor.add_chunk(raw)
+                processor.add_chunk(raw)
                 processor.end_src_stream()
 
                 citation_span.set_attributes({
-                    'citations_cnt': len(ranges)
+                    'citations_cnt': len(processor.all_citations)
                 })
 
-            return QueryResponse(answer=answer_parts(processor.target_text, ranges, len(sources)), sources=sources)
+            return QueryResponse(answer=answer_parts(processor.target_text, processor.all_citations, len(sources)), sources=sources)
 
     def stream(self, request: QueryRequest) -> Iterator[tuple[str, object]]:
         sources = self._sources(request)
@@ -52,7 +52,7 @@ class QueryService:
         processor = CitationProcessor()
         context = self.retrieval.context(sources)
         for chunk in self.generation.stream(request.query, context):
-            delta, _ = processor.add_chunk(chunk)
+            delta = processor.add_chunk(chunk)
             yield "answer_delta", delta
         processor.end_src_stream()
         yield "completed", QueryResponse(
