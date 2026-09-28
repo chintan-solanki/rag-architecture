@@ -10,6 +10,7 @@ ENV PYTHONUNBUFFERED=1
 COPY pyproject.toml uv.lock ./
 COPY api/pyproject.toml ./api/
 
+COPY common/ ./common
 RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
     UV_CONCURRENT_BUILDS=1 \
     UV_CONCURRENT_DOWNLOADS=2 \

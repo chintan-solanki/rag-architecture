@@ -3,16 +3,16 @@ app:
   port: 8000
 qdrant:
   url: http://qdrant:6333
-  collection: hybrid_collection
+  collection: hybrid_collection2
+  fast_embedding_model: 'BAAI/bge-small-en-v1.5'
 kafka:
-  bootstrap_servers: kafka:9092
-  download_topic: document_download_requested
+  download_requested_topic: 'download.requested'
+  document_fetched_topic: 'document.fetched'
 staging:
-  incoming_dir: staging/incoming
-  fetched_dir: staging/fetched
+  incoming_dir_rel_path: staging/incoming
+  fetched_dir_rel_path: staging/fetched
 retrieval:
   top_k: 5
-  fast_embedding_model: 'BAAI/bge-small-en-v1.5'
   embedding_model_cache_dir_name: 'embeddings'
 llm:
   model: gpt-4o-mini

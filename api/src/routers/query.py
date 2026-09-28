@@ -3,11 +3,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from ..models.query import QueryRequest, QueryResponse
 from ..services.query_service import QueryService
-from ..services.configservice import load_config
 from ..telemetry import trace_span
+from common.helpers.configservice import load_config
 
 router = APIRouter()
-config = load_config()
+config = load_config('api/config/config.yml')
 
 _service = QueryService(config)
 

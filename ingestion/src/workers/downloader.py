@@ -1,8 +1,7 @@
-"""Download URL ingestion requests into the filewatcher's incoming directory."""
+"""Download URL ingestion requests into the filewatcher's fetched directory and publishes on document_fetched"""
 
 from __future__ import annotations
 
-import re
 import sys
 from pathlib import Path
 from urllib.parse import unquote, urlparse
@@ -13,29 +12,27 @@ ROOT_DIR = SRC_DIR.parent.parent
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from helpers.configservice import load_config
-from helpers.kafkahelper import KafkaHelper
+from common.helpers.configservice import load_config
+from common.helpers.kafkahelper import KafkaHelper
+from common.helpers.dbrepository import DocumentRepository
 
 
-config = load_config()["downloader"]
-TOPIC = config["kafka_subscribe_topic"]
-CONSUMER_GROUP = config["kafka_subscribe_consumer_group"]
-INCOMING_DIR = ROOT_DIR / config["incoming_dir_rel_path"]
+config = load_config('ingestion/config/config.yml')
 
-_SAFE_FILENAME = re.compile(r"[^A-Za-z0-9._-]")
+DOWNLOAD_REQUESTED_TOPIC = config['kafka']['download_requested_topic']
+DOCUMENT_FETCHED_TOPIC = config['kafka']['document_fetched_topic']
+CONSUMER_GROUP = config['downloader']['consumer_group']
+FETCHED_DIR = Path(config['staging']["fetched_dir_path"])
 
-
-def filename_from_url(url: str) -> str:
-    """Return a safe PDF filename derived from a URL path."""
-    name = Path(unquote(urlparse(url).path)).name or "document.pdf"
-    name = _SAFE_FILENAME.sub("_", name)
-    return name if name.lower().endswith(".pdf") else f"{name}.pdf"
+document_repository = DocumentRepository()
 
 
-def download_document(document_id: str, url: str) -> Path:
-    if not document_id or not url:
-        raise ValueError("document_id and url are required")
+def download_document(ingestion_id:str, document_id: str, client_id:str, url: str, destination: Path) -> Path:
+    if not ingestion_id or not document_id or not url or not url or not destination:
+        raise ValueError("ingestion_id, document_id, url, and destination are all required")
+    
     parsed = urlparse(url)
+    #basic sanity checks
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise ValueError("url must be HTTP(S)")
 
@@ -49,22 +46,57 @@ def download_document(document_id: str, url: str) -> Path:
     if not data.startswith(b"%PDF"):
         raise ValueError("downloaded content is not a PDF")
 
-    INCOMING_DIR.mkdir(parents=True, exist_ok=True)
-    destination = INCOMING_DIR / f"{document_id}_{filename_from_url(url)}"
+
+    #copy bytes to the fetched directory
+    FETCHED_DIR.mkdir(parents=True, exist_ok=True)
     destination.write_bytes(data)
+
     return destination
 
 
 def main() -> None:
-    kafka_helper = KafkaHelper()
-    consumer = kafka_helper.getconsumer(TOPIC, CONSUMER_GROUP)
+    
+    kafkahelper = KafkaHelper()
+    consumer = kafkahelper.getconsumer(DOWNLOAD_REQUESTED_TOPIC, CONSUMER_GROUP)
+    
     for message in consumer:
         event = message.value
         try:
-            download_document(event.get("document_id"), event.get("url"))
+            print(f'download message received: {message}')
+
+            ingestion_id = event.get("ingestion_id") 
+            document_id = event.get("document_id")
+            client_id = event.get("client_id")
+            url = event.get("url")
+            dest_file_name = event.get("dest_file_name")
+            destination = FETCHED_DIR / dest_file_name
+
+            #download to the fetched directory
+            download_document(ingestion_id, document_id, client_id, url, destination)
+
+            #update ingestion record
+            document_repository.upsert_ingestion_record(ingestion_id, document_id, client_id, 'in-progress', 'document.fetched')
+
+            #send kafka notification to document.fetched topic
+            kafkahelper.send_event(DOCUMENT_FETCHED_TOPIC, {
+                'ingestion_id': ingestion_id,
+                'document_id': document_id,
+                'client_id': client_id,
+
+                "source_type": "url",
+                "dest_file_path": str(destination),
+                "dest_file_name": destination.name,
+                "dest_file_type": destination.suffix,
+            })
+
         except Exception as exc:
             print(f"Failed to download document {event.get('document_id')}: {exc}")
+
+            #udpate ingestion record
+            document_repository.upsert_ingestion_record(ingestion_id, document_id, client_id, 'completed', 'download.failed')
+            
         finally:
+            #todo: add retry logic and/or DLQ processing
             consumer.commit()
 
 

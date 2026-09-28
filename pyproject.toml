@@ -1,4 +1,4 @@
 [tool.uv.workspace]
 members = [
-    "api", "ingestion"
+    "common", "api", "ingestion"
 ]

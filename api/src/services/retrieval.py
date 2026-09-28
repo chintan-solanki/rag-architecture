@@ -33,6 +33,8 @@ class RetrievalService:
 
         self.url = url or config['qdrant']['url']
         self.collection = collection or config['qdrant']['collection']
+        self.embedding_model_name = config['qdrant']['fast_embedding_model']
+
         self.top_k = top_k or config['retrieval']['top_k']
         self._index = None
 
@@ -40,7 +42,6 @@ class RetrievalService:
         ROOT_DIR = SRC_DIR.parent.parent
         MODEL_DIR = ROOT_DIR / '.models'
 
-        self.embedding_model_name = config['retrieval']['fast_embedding_model']
         self.embedding_cache_dir = str(MODEL_DIR / config['retrieval']['embedding_model_cache_dir_name'])
 
     def _load_index(self):

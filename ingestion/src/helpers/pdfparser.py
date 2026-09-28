@@ -219,6 +219,26 @@ class PdfParser:
 
         #parse the markdown to find logical sections (treating h2 as the cut_level)
         hierarchical_sections = self._markdown_sections(full_md, file_metadata)
-        sections = self._get_flat_sections(hierarchical_sections, cut_level=cut_level)
+
+        sections = []
+        if len(hierarchical_sections) > 0:
+            sections = self._get_flat_sections(hierarchical_sections, cut_level=cut_level)
 
         return file_metadata, file_page_offsets, sections
+
+
+if __name__ == '__main__':
+
+    import os
+    from pathlib import Path
+
+    root_dir = Path(__file__).parent.parent.parent.parent
+
+    file_path = str(root_dir / 'staging/cfa_l2_multiple_regression.pdf')
+
+    print(f'parsing {file_path}')
+
+    parser = PdfParser()
+    
+    file_metadata, page_offsets, sections = parser.parse(file_path)
+    print(len(sections))

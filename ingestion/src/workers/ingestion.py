@@ -29,28 +29,30 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from helpers.hasher import DocumentHasher
-from helpers.dbrepository import FileRepository
 from helpers.pdfparser import PdfParser, MarkdownSection, SectionMetadata
 from helpers.indexer import Indexer, IndexDocument, IndexChunk
-from helpers.kafkahelper import KafkaHelper
-from helpers.configservice import load_config
+
+from common.helpers.dbrepository import DocumentRepository
+from common.helpers.configservice import load_config
+from common.helpers.kafkahelper import KafkaHelper
 from kafka import KafkaConsumer
 
 print('ingestion worker up...')
 
 #load app specific config 
-config = load_config()['ingestion']
-KAFKA_SUBSCRIBE_TOPIC = config['kafka_subscribe_topic']
-KAFKA_SUBSCRIBE_CONSUMER_GROUP = config['kafka_subscribe_consumer_group']
-QDRANT_COLLECTION = config['qdrant_collection']
-FAST_EMBEDDING_MODEL = config['fast_embedding_model']
+config = load_config('ingestion/config/config.yml')
+
+DOCUMENT_FETCHED_TOPI = config['kafka']['document_fetched_topic']
+
+INGESTION_CONSUMER_GROUP = config['ingestion']['consumer_group']
+QDRANT_COLLECTION = config['qdrant']['collection']
+FAST_EMBEDDING_MODEL = config['qdrant']['fast_embedding_model']
 EMBEDDING_MODEL_CACHE_DIR = MODEL_DIR / 'embeddings'
-DB_PATH = str(ROOT_DIR / os.getenv('DB_REL_PATH'))
+
 QDRANT_URL = os.getenv('QDRANT_URL')
 
-
 hasher = DocumentHasher()
-file_repository = FileRepository(db_path=DB_PATH)
+document_repository = DocumentRepository()
 pdf_parser = PdfParser()
 indexer = Indexer(
     qdrant_url=QDRANT_URL, 
@@ -60,11 +62,11 @@ indexer = Indexer(
     )
 
 kafkahelper = KafkaHelper()
-kafka_consumer = kafkahelper.getconsumer(KAFKA_SUBSCRIBE_TOPIC, KAFKA_SUBSCRIBE_CONSUMER_GROUP)
+kafkaconsumer = kafkahelper.getconsumer(DOCUMENT_FETCHED_TOPI, INGESTION_CONSUMER_GROUP, auto_offset_reset="earliest", enable_auto_commit=False)
 
 def kafka_commit():
     try:
-        kafka_consumer.commit()
+        kafkaconsumer.commit()
     except Exception as excp:
         print('error committing message')
 
@@ -92,37 +94,41 @@ def enrich_chunk_with_citation_data(chunk: IndexChunk, metadata: dict, page_offs
 
     return chunk 
 
-for message in kafka_consumer:
+for message in kafkaconsumer:
 
     message_value = message.value
 
     document_id = message_value.get("document_id")
-    source_path = message_value.get("source_path")
+    doc_path = message_value.get("dest_file_path")
 
-    print(f'message found from kafka.. document_id:{document_id}, source_path:{source_path}')
+    print(f'message found from kafka.. document_id:{document_id}, doc_path:{doc_path}')
 
-    #check if the file exists at the source path, if not log and continue to next message
-    if not source_path or not (file_path := Path(source_path)).exists():
-        print(f"Document ID: {document_id}, Source Path: {source_path} does not exist.")
+    #check if the file exists at the document path, if not log and continue to next message
+    if not doc_path or not (file_path := Path(doc_path)).exists():
+        print(f"Document ID: {document_id}, doc Path: {doc_path} does not exist.")
         kafka_commit() #kakfka ack here to avoid reprocessing this message
         continue
 
     #compute doc hash and check if it already exists in the database.
     file_hash = hasher.hash_document(file_path)
-    print(f'Document ID: {document_id}, Source Path: {source_path} has hash {file_hash}')
+    print(f'Document ID: {document_id}, document path: {doc_path} has hash {file_hash}')
 
-    if file_hash and (existing_file := file_repository.find_by_hash(file_hash)):
+    if file_hash and (existing_file := document_repository.find_by_hash(file_hash)):
         print(f"Document ID: {document_id}, File Hash: {file_hash} already exists in the database with id {existing_file['document_id']}. Skipping ingestion.")
         kafka_commit() #kakfka ack here to skip this message
+        
         continue
     
     with timer('create pdf sections...'):
         # get list of sections from the pdf file. We then treat each section as a separate document and index it.
-        file_metadata, page_offsets, sections = pdf_parser.parse(source_path)
+        file_metadata, page_offsets, sections = pdf_parser.parse(doc_path)
         for section in sections:
             section.metadata.document_id = document_id
-        print(f"Document ID: {document_id}, Source Path: {source_path} has been parsed into {len(sections)} sections.")
-
+        
+    log_message = f"Document ID: {document_id} has been parsed into {len(sections)} sections."
+    print(log_message)
+    
+    
     with timer('index chunks...'):
         #create index documents from the sections and index them in the vector store.
         
@@ -139,11 +145,13 @@ for message in kafka_consumer:
             transform_chunk_fn=lambda c, m: enrich_chunk_with_citation_data(c, m, page_offsets),
             )
 
-    print(f"Document ID: {document_id}, Source Path: {source_path} has been indexed")
+    log_messsage = f"Document ID: {document_id}, document path: {doc_path} has been indexed"
+    print(log_message)
+    
 
     with timer('add to database...'):
         #add the document to the database
-        file_repository.insert_or_ignore(
+        document_repository.insert_or_ignore(
             document_id,
             content_hash=file_hash,
             content_length=file_metadata.get('file_length', 0),

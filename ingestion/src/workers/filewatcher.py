@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import json
-import logging
-import os
 import re
 import shutil
 import uuid
@@ -19,55 +16,44 @@ print(f'ROOT_DIR = {ROOT_DIR}, SRC_DIR={SRC_DIR}')
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from helpers.configservice import load_config
+from common.helpers.configservice import load_config
 from helpers.stablewatcher import StableWatcher
-from helpers.kafkahelper import KafkaHelper
+
+from common.helpers.kafkahelper import KafkaHelper
+from common.helpers.dbrepository import DocumentRepository
 
 # -----------------------------------------------------------------------------
 # Configuration
 # -----------------------------------------------------------------------------
 
-config = load_config()['filewatcher']
+config = load_config('ingestion/config/config.yml')
 
+INCOMING_DIR = Path(config['staging']['incoming_dir_path'])
+FETCHED_DIR = Path(config['staging']['fetched_dir_path'])
+STABLE_CHECKS = config['filewatcher']['stable_checks']
+CHECK_INTERVAL = config['filewatcher']['check_interval']
+INITIAL_DELAY = config['filewatcher']['initial_delay']
+MAX_WORKERS = config['filewatcher']['max_workers']
+DOCUMENT_FETCHED_TOPIC = config['kafka']['document_fetched_topic']
 
-INCOMING_DIR = ROOT_DIR / config['incoming_dir_rel_path']
-FETCHED_DIR = ROOT_DIR / config['fetched_dir_rel_path']
-STABLE_CHECKS = config['stable_checks']
-CHECK_INTERVAL = config['check_interval']
-INITIAL_DELAY = config['initial_delay']
-MAX_WORKERS = config['max_workers']
-kAFKA_PUBLISH_TOPIC = config['kafka_publish_topic']
+kafkahelper = KafkaHelper()
+document_repository = DocumentRepository()
 
-# -----------------------------------------------------------------------------
-# Configuration
-# -----------------------------------------------------------------------------
+DOCUMENT_ID_PREFIX = re.compile(r"^(?P<ingestion_id>[0-9a-fA-F]{32})_.*")
 
-kafka_helper = KafkaHelper()
-
-def make_unique_destination(source: Path) -> Path:
-    
-    destination = FETCHED_DIR / source.name
-
-    if not destination.exists():
-        return destination
-
-    return (
-        FETCHED_DIR
-        / f"{source.stem}_{uuid.uuid4().hex}{source.suffix}"
-    )
-
-DOCUMENT_ID_PREFIX = re.compile(r"^(?P<document_id>[0-9a-fA-F]{32})_.+")
-
-
-def publish_kafka_event(file_path, document_id):
+def publish_kafka_event(ingestion_id, document_id, client_id, destination):
     event = {
+        "ingestion_id": ingestion_id,
         "document_id": document_id,
+        "client_id": client_id,
+
         "source_type": "filewatcher",
-        "source_path": str(file_path),
-        "file_type": file_path.suffix,
+        "dest_file_path": str(destination),
+        "dest_file_name": destination.name,
+        "dest_file_type": destination.suffix,
     }
     
-    kafka_helper.send_event(kAFKA_PUBLISH_TOPIC, event)
+    kafkahelper.send_event(DOCUMENT_FETCHED_TOPIC, event)
 
 def handle_stable_file(source: Path) -> None:
     
@@ -77,16 +63,34 @@ def handle_stable_file(source: Path) -> None:
 
     FETCHED_DIR.mkdir(parents=True, exist_ok=True)
 
-    # check if the file already contains the document_id
-    match = DOCUMENT_ID_PREFIX.match(source.name)
+    client_id = ''
+
+    # check if the file is already in already contains the ingestion_id
+    match = DOCUMENT_ID_PREFIX.match(source.stem)
     if match:
-        #file came from the api, use the same file name as the destination file name 
-        document_id = match.group("document_id")
+        #file came from the api, so file stem is the document_id. use the same file name as the target.
+        ingestion_id, document_id = match.group("ingestion_id"), match.group(0)
         dest_name = source.name
+
+        #retrieve client_id from ingestion record.
+        ingestion_record = document_repository.get_ingestion_record(ingestion_id)
+
+        if ingestion_record and ingestion_record.client_id:
+            client_id = ingestion_record.client_id
+
     else:
-        #the file was copied in incoming directory manually, generate a random doc id and append to file name
-        document_id = uuid.uuid4().hex
-        dest_name = f'{source.stem}_{document_id}{source.suffix}'
+        #the file was copied in incoming directory manually
+
+        #generate a random ingestion id
+        ingestion_id = uuid.uuid4().hex
+
+        #generate document id by combining ingestion id and source file stem
+        document_id = f'{ingestion_id}_{source.stem}'
+
+        client_id = 'filewatcher'
+        
+        #dest name is document_id and file  suffix
+        dest_name = f'{document_id}.{source.suffix}'
 
     destination = FETCHED_DIR / dest_name
     
@@ -106,9 +110,18 @@ def handle_stable_file(source: Path) -> None:
 
     #publish kafka event for the copied file if it was copied and not ignored
     if not ignored and copied:
+
+        try:
+            #update ingestion record in db
+            document_repository.upsert_ingestion_record(ingestion_id, document_id, client_id, 'in-progress', 'document.fetched')
+        except Exception as exc:
+            print(f"Failed to update ingestion record for {ingestion_id}")
+            print(exc)
+            return 
+        
         try:
             #publish kafka event for the copied file
-            publish_kafka_event(destination, document_id)
+            publish_kafka_event(ingestion_id, document_id, client_id, destination)
         except Exception:
             print("Failed to publish kafka event for %s", destination)
             return
@@ -123,8 +136,6 @@ def handle_stable_file(source: Path) -> None:
                 source,
             )
             return
-
-
 
 # -----------------------------------------------------------------------------
 # Application lifecycle

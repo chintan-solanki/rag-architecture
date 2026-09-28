@@ -1,22 +1,27 @@
-from kafka import KafkaProducer, KafkaConsumer
 import os
 import json
-import time
-
-KAFKA_BOOTSTRAP_SERVERS = "kafka:9092"
+from time import time
+from typing import Any
+from kafka import KafkaProducer, KafkaConsumer
 
 class KafkaHelper:
+    def __init__(self, bootstrap_servers: str | None = None):
+        self.bootstrap_servers = bootstrap_servers 
+        if not self.bootstrap_servers:
+            self.bootstrap_servers = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
 
-    def __init__(self):
+        self._producer = None
         
-        self.bootstrap_servers = os.getenv("KAFKA_BOOTSTRAP_SERVERS", KAFKA_BOOTSTRAP_SERVERS)
+    @property
+    def producer(self):
+        if self._producer is None:
+            self._producer = KafkaProducer(
+                bootstrap_servers=self.bootstrap_servers,
+                value_serializer=lambda value: json.dumps(value).encode(),
+            )
+        return self._producer
 
-        self.producer = KafkaProducer(
-            bootstrap_servers=self.bootstrap_servers,
-            value_serializer=lambda value: json.dumps(value).encode("utf-8"),
-        )
-
-    def send_event(self, topic, event, retry_cnt=3):
+    def send_event(self, topic:str, event: dict[str, Any], retry_cnt=3) -> None:
         for attempt in range(retry_cnt):
             try:
                 future = self.producer.send(topic, value=event)
@@ -35,16 +40,13 @@ class KafkaHelper:
         #todo: add logic to push this to a dead letter topic or to some other durable log to avoid losing the event
 
 
-    def getconsumer(self, topic, group_id) -> KafkaConsumer:
+    def getconsumer(self, topic, group_id, auto_offset_reset='latest', enable_auto_commit=True) -> KafkaConsumer:
         consumer = (KafkaConsumer(
             topic,
             bootstrap_servers=self.bootstrap_servers,
             value_deserializer=lambda value: json.loads(value.decode("utf-8")),
             group_id=group_id,
-            auto_offset_reset="earliest",
-            enable_auto_commit=False,
-            
+            auto_offset_reset=auto_offset_reset,
+            enable_auto_commit=enable_auto_commit,
         ))
         return consumer
-
-    

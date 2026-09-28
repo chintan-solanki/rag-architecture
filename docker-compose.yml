@@ -87,6 +87,9 @@ services:
       - type: bind
         source: ./staging #points to rag-architecture/staging
         target: /app/staging
+      - type: bind
+        source: ./database #points to rag-architecture/database
+        target: /app/database
 
   downloader:
     build:
@@ -104,6 +107,9 @@ services:
       - type: bind
         source: ./staging
         target: /app/staging
+      - type: bind
+        source: ./database #points to rag-architecture/database
+        target: /app/database
 
   ingestion:
     build:
@@ -150,7 +156,7 @@ services:
       - QDRANT_URL=${QDRANT_URL:-http://qdrant:6333}
     depends_on:
       kafka:
-        condition: service_healthy
+        condition: service_started
       qdrant:
         condition: service_started
 
@@ -165,6 +171,9 @@ services:
       - type: bind
         source: ./.models #points to rag-architecture/.models
         target: /app/.models
+      - type: bind
+        source: ./database #points to rag-architecture/database/sqlite
+        target: /app/database
       
 volumes:
   kafka_data:
@@ -174,6 +183,3 @@ configs:
     file: ./ingestion/config/config.yml
   api_config:
     file: ./api/config/config.yml
-
-
-  
