@@ -6,7 +6,7 @@ qdrant:
   collection: hybrid_collection2
   fast_embedding_model: 'BAAI/bge-small-en-v1.5'
 kafka:
-  download_requested_topic: 'download.requested'
+  url_requested_topic: 'url.requested'
   document_fetched_topic: 'document.fetched'
 staging:
   incoming_dir_rel_path: staging/incoming

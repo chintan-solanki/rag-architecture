@@ -60,6 +60,19 @@ services:
       qdrant:
         condition: service_started
 
+  redis:
+    image: redis:8-alpine
+    container_name: rag-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      
   jaeger:
     image: jaegertracing/all-in-one:latest
     container_name: rag-jaeger
@@ -118,15 +131,21 @@ services:
     container_name: rag-ingestion
     command: python ingestion/src/workers/ingestion.py
     depends_on:
-      kafka:
-        condition: service_healthy
       qdrant-init:
           condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      
     environment:
       - HF_TOKEN=${HF_TOKEN}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - DB_REL_PATH=${DB_REL_PATH}
       - QDRANT_URL=${QDRANT_URL}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_DB=${REDIS_DB}
     
     configs:
       - source: ingestion_config
@@ -154,12 +173,17 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - HF_TOKEN=${HF_TOKEN}
       - QDRANT_URL=${QDRANT_URL:-http://qdrant:6333}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_DB=${REDIS_DB}
     depends_on:
-      kafka:
-        condition: service_started
       qdrant:
         condition: service_started
-
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      
     configs:
       - source: api_config
         target: /app/api/config/config.yml

@@ -158,3 +158,23 @@ class DocumentRepository:
                 return None
 
             return dict(row)
+
+    def get_inprogress_ingestions(self, client_id: str) -> list[dict] | None:
+                
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+
+            cursor = conn.execute(
+                """
+                SELECT ingestion_id, document_id, client_id, status, stage, error, created_at, updated_at
+                FROM ingestions
+                WHERE client_id = ?
+                AND status = 'in-progress'
+                ORDER BY created_at ASC
+                """,
+                (client_id,),
+            )
+
+            rows = cursor.fetchall()
+
+            return [dict(row) for row in rows] if rows else []

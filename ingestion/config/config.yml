@@ -1,5 +1,5 @@
 kafka:
-  download_requested_topic: 'download.requested'
+  url_requested_topic: 'url.requested'
   document_fetched_topic: 'document.fetched'
 
 qdrant:

@@ -21,7 +21,8 @@ dependencies = [
     "opentelemetry-api>=1.27.0",
     "opentelemetry-sdk>=1.27.0",
     "opentelemetry-exporter-otlp>=1.44.0",
-    "common"
+    "redis[hiredis]>=8.1.0",
+    "common",
 ]
 
 [build-system]

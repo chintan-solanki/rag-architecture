@@ -233,8 +233,8 @@ if __name__ == '__main__':
     from pathlib import Path
 
     root_dir = Path(__file__).parent.parent.parent.parent
-
-    file_path = str(root_dir / 'staging/cfa_l2_multiple_regression.pdf')
+                               
+    file_path = str(root_dir / 'staging/7.4.3.4. 1-Way ANOVA calculations.pdf')
 
     print(f'parsing {file_path}')
 

@@ -15,17 +15,19 @@ if str(SRC_DIR) not in sys.path:
 from common.helpers.configservice import load_config
 from common.helpers.kafkahelper import KafkaHelper
 from common.helpers.dbrepository import DocumentRepository
+from common.helpers.ingestionstate import IngestionDocumentState
+from common.helpers.redishelper import RedisHelper
 
 
 config = load_config('ingestion/config/config.yml')
 
-DOWNLOAD_REQUESTED_TOPIC = config['kafka']['download_requested_topic']
+URL_REQUESTED_TOPIC = config['kafka']['url_requested_topic']
 DOCUMENT_FETCHED_TOPIC = config['kafka']['document_fetched_topic']
 CONSUMER_GROUP = config['downloader']['consumer_group']
 FETCHED_DIR = Path(config['staging']["fetched_dir_path"])
 
 document_repository = DocumentRepository()
-
+redis_helper = RedisHelper().__enter__()
 
 def download_document(ingestion_id:str, document_id: str, client_id:str, url: str, destination: Path) -> Path:
     if not ingestion_id or not document_id or not url or not url or not destination:
@@ -57,7 +59,7 @@ def download_document(ingestion_id:str, document_id: str, client_id:str, url: st
 def main() -> None:
     
     kafkahelper = KafkaHelper()
-    consumer = kafkahelper.getconsumer(DOWNLOAD_REQUESTED_TOPIC, CONSUMER_GROUP)
+    consumer = kafkahelper.getconsumer(URL_REQUESTED_TOPIC, CONSUMER_GROUP)
     
     for message in consumer:
         event = message.value
@@ -74,8 +76,10 @@ def main() -> None:
             #download to the fetched directory
             download_document(ingestion_id, document_id, client_id, url, destination)
 
+            ingestion_document_state = IngestionDocumentState(document_repository, redis_helper, ingestion_id, document_id, client_id)
+
             #update ingestion record
-            document_repository.upsert_ingestion_record(ingestion_id, document_id, client_id, 'in-progress', 'document.fetched')
+            ingestion_document_state.RecordState(status='in-progress', stage='document has been downloaded')
 
             #send kafka notification to document.fetched topic
             kafkahelper.send_event(DOCUMENT_FETCHED_TOPIC, {
@@ -93,7 +97,8 @@ def main() -> None:
             print(f"Failed to download document {event.get('document_id')}: {exc}")
 
             #udpate ingestion record
-            document_repository.upsert_ingestion_record(ingestion_id, document_id, client_id, 'completed', 'download.failed')
+            ingestion_document_state.RecordState(status='failed', stage='document download failed')
+            
             
         finally:
             #todo: add retry logic and/or DLQ processing

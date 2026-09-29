@@ -29,13 +29,14 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from helpers.hasher import DocumentHasher
-from helpers.pdfparser import PdfParser, MarkdownSection, SectionMetadata
+from helpers.pdfparser import PdfParser, MarkdownSection
 from helpers.indexer import Indexer, IndexDocument, IndexChunk
 
-from common.helpers.dbrepository import DocumentRepository
+from common.helpers.ingestionstate import IngestionDocumentState
 from common.helpers.configservice import load_config
 from common.helpers.kafkahelper import KafkaHelper
-from kafka import KafkaConsumer
+from common.helpers.dbrepository import DocumentRepository
+from common.helpers.redishelper import RedisHelper
 
 print('ingestion worker up...')
 
@@ -53,6 +54,7 @@ QDRANT_URL = os.getenv('QDRANT_URL')
 
 hasher = DocumentHasher()
 document_repository = DocumentRepository()
+
 pdf_parser = PdfParser()
 indexer = Indexer(
     qdrant_url=QDRANT_URL, 
@@ -67,7 +69,7 @@ kafkaconsumer = kafkahelper.getconsumer(DOCUMENT_FETCHED_TOPI, INGESTION_CONSUME
 def kafka_commit():
     try:
         kafkaconsumer.commit()
-    except Exception as excp:
+    except BaseException as excp:
         print('error committing message')
 
 '''
@@ -94,75 +96,93 @@ def enrich_chunk_with_citation_data(chunk: IndexChunk, metadata: dict, page_offs
 
     return chunk 
 
-for message in kafkaconsumer:
+with RedisHelper() as redis_helper:
 
-    message_value = message.value
+    #process message from kafka 'document.fetched' topic
+    for message in kafkaconsumer:
 
-    document_id = message_value.get("document_id")
-    doc_path = message_value.get("dest_file_path")
+        message_value = message.value
 
-    print(f'message found from kafka.. document_id:{document_id}, doc_path:{doc_path}')
+        dest_file_path = message_value.get("dest_file_path")
+        ingestion_id = message_value.get("ingestion_id")
+        document_id = message_value.get("document_id")
+        client_id = message_value.get("client_id")
 
-    #check if the file exists at the document path, if not log and continue to next message
-    if not doc_path or not (file_path := Path(doc_path)).exists():
-        print(f"Document ID: {document_id}, doc Path: {doc_path} does not exist.")
-        kafka_commit() #kakfka ack here to avoid reprocessing this message
-        continue
+        ingestion_document_state = IngestionDocumentState(document_repository, redis_helper, ingestion_id, document_id, client_id)
 
-    #compute doc hash and check if it already exists in the database.
-    file_hash = hasher.hash_document(file_path)
-    print(f'Document ID: {document_id}, document path: {doc_path} has hash {file_hash}')
+        print(f'message found from kafka.. document_id:{document_id}, doc_path:{dest_file_path}')
 
-    if file_hash and (existing_file := document_repository.find_by_hash(file_hash)):
-        print(f"Document ID: {document_id}, File Hash: {file_hash} already exists in the database with id {existing_file['document_id']}. Skipping ingestion.")
-        kafka_commit() #kakfka ack here to skip this message
+        #check if the file exists at the document path, if not log and continue to next message
+        if not dest_file_path or not (file_path := Path(dest_file_path)).exists():
+            print(f"Document ID: {document_id}, doc Path: {dest_file_path} does not exist.")
+            kafka_commit() #kakfka ack here to avoid reprocessing this message
+            continue
+
+        #compute doc hash and check if it already exists in the database.
+        file_hash = hasher.hash_document(file_path)
+
+        if file_hash and (existing_file := document_repository.find_by_hash(file_hash)):
+            print(f"Document ID: {document_id}, File Hash: {file_hash} already exists in the database with id {existing_file['document_id']}. Skipping ingestion.")
+            ingestion_document_state.RecordState('failed', 'duplicate', f'document already exists {existing_file["document_id"]}')
+            kafka_commit() #kakfka ack here to skip this message
+            
+            continue
+
+        with timer('create pdf sections...'):
+            try:
+                # get list of sections from the pdf file. We then treat each section as a separate document and index it.
+                file_metadata, page_offsets, sections = pdf_parser.parse(dest_file_path)
+                for section in sections:
+                    section.metadata.document_id = document_id
+            except BaseException as exc:
+
+                ingestion_document_state.RecordState('failed', 'parsing error', f'{exc}')
+                continue
+
+        ingestion_document_state.RecordState('in-progress', f'document parsed into sections')
         
-        continue
-    
-    with timer('create pdf sections...'):
-        # get list of sections from the pdf file. We then treat each section as a separate document and index it.
-        file_metadata, page_offsets, sections = pdf_parser.parse(doc_path)
-        for section in sections:
-            section.metadata.document_id = document_id
-        
-    log_message = f"Document ID: {document_id} has been parsed into {len(sections)} sections."
-    print(log_message)
-    
-    
-    with timer('index chunks...'):
-        #create index documents from the sections and index them in the vector store.
-        
-        index_docs = [IndexDocument(
-            #doc_id is combination of file hash and section text hash
-            doc_id = f'{file_hash}_{hasher.hash_document(section.text.encode())}',
-            text=section.text,
-            metadata=section.metadata,
-        ) for section in sections if isinstance(section, MarkdownSection)]
-                                                                                
-        #indexer chunks the documents and indexes them in the vector store.
-        indexer.index(
-            index_docs, 
-            transform_chunk_fn=lambda c, m: enrich_chunk_with_citation_data(c, m, page_offsets),
+        with timer('index chunks...'):
+
+            try:
+                print('creating index docs..')
+                #create index documents from the sections and index them in the vector store.
+                index_docs = [IndexDocument(
+                    #doc_id is combination of file hash and section text hash
+                    doc_id = f'{file_hash}_{hasher.hash_document(section.text.encode())}',
+                    text=section.text,
+                    metadata=section.metadata,
+                ) for section in sections if isinstance(section, MarkdownSection)]
+
+                print('calling index method..')                                            
+                #indexer chunks the documents and indexes them in the vector store.
+                indexer.index(
+                    index_docs, 
+                    transform_chunk_fn=lambda c, m: enrich_chunk_with_citation_data(c, m, page_offsets),
+                    )
+
+                print('indexing complete..')
+                
+            except BaseException as exc:
+                print(f'indexing error {exc}')
+                ingestion_document_state.RecordState('failed', 'indexing/chunking error', f'{exc}')
+                continue
+
+        ingestion_document_state.RecordState('completed', f'document successfully indexed into vector store.')
+
+        with timer('add to database...'):
+            #add the document to the database
+            document_repository.insert_or_ignore(
+                document_id,
+                content_hash=file_hash,
+                content_length=file_metadata.get('file_length', 0),
+                metadata=file_metadata
             )
 
-    log_messsage = f"Document ID: {document_id}, document path: {doc_path} has been indexed"
-    print(log_message)
-    
+        print(f"Document ID: {document_id} object has been stored in db")
 
-    with timer('add to database...'):
-        #add the document to the database
-        document_repository.insert_or_ignore(
-            document_id,
-            content_hash=file_hash,
-            content_length=file_metadata.get('file_length', 0),
-            metadata=file_metadata
-        )
+        with timer('kafka ack...'):
+            #send kafka ack
+            kafka_commit()    
 
-    print(f"Document ID: {document_id} object has been stored in db")
-
-    with timer('kafka ack...'):
-        #send kafka ack
-        kafka_commit()    
-    
 
 print('ingestion worker finished...')
