@@ -40,6 +40,7 @@ class IngestionService:
         #generate a random ingestion id
         ingestion_id = uuid.uuid4().hex
         document_id = f'{ingestion_id}_{file_stem}'
+        original_file_name = upload.filename
 
         ingestion_document_state = IngestionDocumentState(self.document_repository, self.redis_helper, ingestion_id, document_id, client_id)
 
@@ -62,11 +63,12 @@ class IngestionService:
             'ingestion_id': ingestion_id,
             'document_id': document_id,
             'client_id': client_id,
+            'original_file_name': original_file_name,
 
-            "source_type": "upload",
-            "dest_file_path": str(destination),
-            "dest_file_name": destination.name,
-            "dest_file_type": destination.suffix,
+            'source_type' : 'upload',
+            'dest_file_path': str(destination),
+            'dest_file_name': destination.name,
+            'dest_file_type': destination.suffix,
         })
 
         ingestion_document_state.RecordState(status='in-progress', stage='file uploaded to server')
@@ -83,6 +85,7 @@ class IngestionService:
         file_stem = f'{parsed.hostname}{parsed.path}'.replace('/', '_')
         document_id = f'{ingestion_id}_{file_stem}'
         dest_file_name = f'{document_id}.pdf'
+        original_file_name = f'{parsed.hostname}{parsed.path}'
 
         ingestion_document_state = IngestionDocumentState(self.document_repository, self.redis_helper, ingestion_id, document_id, client_id)
         
@@ -94,6 +97,7 @@ class IngestionService:
             "ingestion_id": ingestion_id, 
             "document_id": document_id, 
             "client_id" : client_id,
+            "original_file_name": original_file_name,
             "url": url,
             "dest_file_name": dest_file_name
             }

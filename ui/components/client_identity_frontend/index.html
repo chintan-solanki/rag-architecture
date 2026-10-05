@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RAG UI client identity</title>
+  </head>
+  <body>
+    <script>
+      (() => {
+        const storageKey = "rag-ui-client-id";
+        let initialized = false;
+
+        function post(type, payload = {}) {
+          window.parent.postMessage(
+            { isStreamlitMessage: true, type, ...payload },
+            "*"
+          );
+        }
+
+        function newId() {
+          if (crypto.randomUUID) return crypto.randomUUID();
+          const bytes = new Uint8Array(16);
+          crypto.getRandomValues(bytes);
+          bytes[6] = (bytes[6] & 0x0f) | 0x40;
+          bytes[8] = (bytes[8] & 0x3f) | 0x80;
+          const hex = Array.from(bytes, (byte) =>
+            byte.toString(16).padStart(2, "0")
+          );
+          return [
+            hex.slice(0, 4).join(""),
+            hex.slice(4, 6).join(""),
+            hex.slice(6, 8).join(""),
+            hex.slice(8, 10).join(""),
+            hex.slice(10, 16).join(""),
+          ].join("-");
+        }
+
+        function initializeIdentity() {
+          if (initialized) return;
+          initialized = true;
+          try {
+            let clientId = window.localStorage.getItem(storageKey);
+            if (!clientId) {
+              clientId = newId();
+              window.localStorage.setItem(storageKey, clientId);
+            }
+            post("streamlit:setComponentValue", { value: { client_id: clientId } });
+          } catch (error) {
+            post("streamlit:setComponentValue", {
+              value: { error: "Browser storage is unavailable." },
+            });
+          }
+        }
+
+        window.addEventListener("message", (event) => {
+          if (event.data && event.data.type === "streamlit:render") {
+            initializeIdentity();
+          }
+        });
+        post("streamlit:componentReady", { apiVersion: 1 });
+        post("streamlit:setFrameHeight", { height: 0 });
+      })();
+    </script>
+  </body>
+</html>

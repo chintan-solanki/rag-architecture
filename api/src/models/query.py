@@ -36,6 +36,7 @@ class Source(BaseModel):
     text: str
     section_title: str | None = None
     file_name: str | None = None
+    original_file_name: str | None = None
     file_title: str | None = None
     file_author: str | None = None
     chunk_start_page_idx: int | None = None

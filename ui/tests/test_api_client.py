@@ -1,0 +1,120 @@
+import json
+import unittest
+from unittest.mock import patch
+from urllib.parse import parse_qs
+
+from ui.api_client import RagApiClient
+
+
+class FakeResponse:
+    def __init__(self, body: bytes, content_type: str = "application/json") -> None:
+        self.body = body
+        self.headers = {"Content-Type": content_type}
+        self.closed = False
+
+    def read(self) -> bytes:
+        return self.body
+
+    def close(self) -> None:
+        self.closed = True
+
+    def __iter__(self):
+        return iter(self.body.splitlines(keepends=True))
+
+
+class ApiClientTests(unittest.TestCase):
+    @patch("ui.api_client.urllib.request.urlopen")
+    def test_url_submission_sends_expected_form_and_client_header(self, urlopen) -> None:
+        response = FakeResponse(b'{"ingestion_id":"ing-1"}')
+        urlopen.return_value = response
+        client = RagApiClient("http://localhost:8000/")
+
+        ingestion_id = client.submit_url(
+            client_id="browser-1", url="https://example.com/doc.pdf"
+        )
+
+        request = urlopen.call_args.args[0]
+        self.assertEqual(ingestion_id, "ing-1")
+        self.assertEqual(request.full_url, "http://localhost:8000/api/v1/documents")
+        self.assertEqual(request.get_header("X_client_id"), "browser-1")
+        self.assertEqual(request.get_header("X-client-id"), "browser-1")
+        self.assertEqual(
+            parse_qs(request.data.decode()), {"url": ["https://example.com/doc.pdf"]}
+        )
+        self.assertTrue(response.closed)
+
+    @patch("ui.api_client.urllib.request.urlopen")
+    def test_upload_sends_pdf_as_multipart_file(self, urlopen) -> None:
+        urlopen.return_value = FakeResponse(b'{"ingestion_id":"ing-2"}')
+        client = RagApiClient("http://localhost:8000")
+
+        ingestion_id = client.submit_upload(
+            client_id="browser-2",
+            filename="report.pdf",
+            content=b"%PDF-1.7\n",
+            content_type="application/pdf",
+        )
+
+        request = urlopen.call_args.args[0]
+        self.assertEqual(ingestion_id, "ing-2")
+        self.assertIn('name="file"; filename="report.pdf"', request.data.decode())
+        self.assertIn(b"%PDF-1.7", request.data)
+        self.assertEqual(request.get_header("X_client_id"), "browser-2")
+        self.assertEqual(request.get_header("X-client-id"), "browser-2")
+        self.assertTrue(request.get_header("Content-type").startswith("multipart/form-data; boundary="))
+
+    @patch("ui.api_client.urllib.request.urlopen")
+    def test_query_stream_sends_search_payload_and_decodes_events(self, urlopen) -> None:
+        response = FakeResponse(
+            b'event: answer_delta\ndata: {"text":"Hello"}\n\n'
+            b'event: completed\ndata: {"answer":[],"sources":[]}\n\n',
+            "text/event-stream",
+        )
+        urlopen.return_value = response
+        client = RagApiClient("http://localhost:8000")
+
+        events = list(
+            client.iter_query_events(
+                client_id="browser-3",
+                query="What is RAG?",
+                search_type="dense",
+                top_k=4,
+            )
+        )
+
+        request = urlopen.call_args.args[0]
+        self.assertEqual(
+            json.loads(request.data),
+            {
+                "query": "What is RAG?",
+                "search_type": "dense",
+                "search": {"top_k": 4},
+            },
+        )
+        self.assertEqual(request.get_header("X_client_id"), "browser-3")
+        self.assertEqual(request.get_header("X-client-id"), "browser-3")
+        self.assertEqual([event.event for event in events], ["answer_delta", "completed"])
+        self.assertTrue(response.closed)
+
+    @patch("ui.api_client.urllib.request.urlopen")
+    def test_ingestion_events_include_client_identity_for_current_api_route(
+        self, urlopen
+    ) -> None:
+        response = FakeResponse(b"", "text/event-stream")
+        urlopen.return_value = response
+        client = RagApiClient("http://localhost:8000")
+
+        opened = client.open_ingestion_events("browser id")
+        request = urlopen.call_args.args[0]
+
+        self.assertEqual(
+            request.full_url,
+            "http://localhost:8000/api/v1/documents/events?x_client_id=browser+id",
+        )
+        self.assertEqual(request.get_header("X_client_id"), "browser id")
+        self.assertEqual(request.get_header("X-client-id"), "browser id")
+        opened.close()
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -177,12 +177,18 @@ services:
       - REDIS_PORT=${REDIS_PORT}
       - REDIS_DB=${REDIS_DB}
     depends_on:
-      qdrant:
-        condition: service_started
+      qdrant-init:
+          condition: service_completed_successfully
       redis:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      ingestion:
+        condition: service_started
+      downloader:
+        condition: service_started
+      filewatcher:
+        condition: service_started
       
     configs:
       - source: api_config
@@ -198,6 +204,20 @@ services:
       - type: bind
         source: ./database #points to rag-architecture/database/sqlite
         target: /app/database
+
+  ui:
+    build:
+      context: .
+      dockerfile: ui/Dockerfile
+    container_name: rag-ui
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    environment:
+      - RAG_API_BASE_URL=${RAG_API_BASE_URL:-http://api:8000}
+    depends_on:
+      api:
+        condition: service_started
       
 volumes:
   kafka_data:

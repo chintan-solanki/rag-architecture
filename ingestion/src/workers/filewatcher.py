@@ -39,13 +39,12 @@ DOCUMENT_FETCHED_TOPIC = config['kafka']['document_fetched_topic']
 kafkahelper = KafkaHelper()
 document_repository = DocumentRepository()
 
-DOCUMENT_ID_PREFIX = re.compile(r"^(?P<ingestion_id>[0-9a-fA-F]{32})_.*")
-
-def publish_kafka_event(ingestion_id, document_id, client_id, destination):
+def publish_kafka_event(ingestion_id, document_id, original_file_name, client_id, destination):
     event = {
         "ingestion_id": ingestion_id,
         "document_id": document_id,
         "client_id": client_id,
+        "original_file_name": original_file_name,
 
         "source_type": "filewatcher",
         "dest_file_path": str(destination),
@@ -54,6 +53,8 @@ def publish_kafka_event(ingestion_id, document_id, client_id, destination):
     }
     
     kafkahelper.send_event(DOCUMENT_FETCHED_TOPIC, event)
+
+DOCUMENT_ID_PREFIX = re.compile(r"^(?P<ingestion_id>[0-9a-fA-F]{32})_(?P<original_file_name>.*)$")
 
 def handle_stable_file(source: Path) -> None:
     
@@ -69,7 +70,10 @@ def handle_stable_file(source: Path) -> None:
     match = DOCUMENT_ID_PREFIX.match(source.stem)
     if match:
         #file came from the api, so file stem is the document_id. use the same file name as the target.
-        ingestion_id, document_id = match.group("ingestion_id"), match.group(0)
+        document_id = match.group(0)
+        ingestion_id = match.group("ingestion_id")
+        original_file_name = match.group("original_file_name") 
+        
         dest_name = source.name
 
         #retrieve client_id from ingestion record.
@@ -88,6 +92,8 @@ def handle_stable_file(source: Path) -> None:
         document_id = f'{ingestion_id}_{source.stem}'
 
         client_id = 'filewatcher'
+
+        original_file_name = source.name
         
         #dest name is document_id and file  suffix
         dest_name = f'{document_id}.{source.suffix}'
@@ -121,7 +127,7 @@ def handle_stable_file(source: Path) -> None:
         
         try:
             #publish kafka event for the copied file
-            publish_kafka_event(ingestion_id, document_id, client_id, destination)
+            publish_kafka_event(ingestion_id, document_id, original_file_name, client_id, destination)
         except Exception:
             print("Failed to publish kafka event for %s", destination)
             return

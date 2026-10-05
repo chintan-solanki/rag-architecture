@@ -107,6 +107,7 @@ with RedisHelper() as redis_helper:
         ingestion_id = message_value.get("ingestion_id")
         document_id = message_value.get("document_id")
         client_id = message_value.get("client_id")
+        original_file_name = message_value.get("original_file_name")
 
         ingestion_document_state = IngestionDocumentState(document_repository, redis_helper, ingestion_id, document_id, client_id)
 
@@ -134,6 +135,8 @@ with RedisHelper() as redis_helper:
                 file_metadata, page_offsets, sections = pdf_parser.parse(dest_file_path)
                 for section in sections:
                     section.metadata.document_id = document_id
+                    section.metadata.original_file_name = original_file_name
+                    
             except BaseException as exc:
 
                 ingestion_document_state.RecordState('failed', 'parsing error', f'{exc}')

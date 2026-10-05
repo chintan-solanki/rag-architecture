@@ -38,8 +38,8 @@ async def documents(file: UploadFile | None = File(default=None), url: str | Non
     return DocumentAccepted(ingestion_id=ingestion_id)
 
 @router.get('/documents/events', response_class=EventSourceResponse)
-#def events(x_client_id: Annotated[str | None, Header()] = None):
-def events(x_client_id: str = None):
+def events(x_client_id: Annotated[str | None, Header()] = None):
+#def events(x_client_id: str = None):
 
     with RedisHelper() as redis_helper:
 

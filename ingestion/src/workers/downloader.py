@@ -68,6 +68,7 @@ def main() -> None:
 
             ingestion_id = event.get("ingestion_id") 
             document_id = event.get("document_id")
+            original_file_name = event.get("original_file_name")
             client_id = event.get("client_id")
             url = event.get("url")
             dest_file_name = event.get("dest_file_name")
@@ -85,6 +86,7 @@ def main() -> None:
             kafkahelper.send_event(DOCUMENT_FETCHED_TOPIC, {
                 'ingestion_id': ingestion_id,
                 'document_id': document_id,
+                'original_file_name': original_file_name,
                 'client_id': client_id,
 
                 "source_type": "url",

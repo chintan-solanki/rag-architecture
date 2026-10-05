@@ -43,11 +43,11 @@ class GenerationService:
         
         ### Citation format
     
-        `[[cite]][source_id]`
+        `[[cite]][1]`
     
         For multiple sources, use a comma-separated list:
     
-        `[[cite]][s1,s3,s7]`
+        `[[cite]][1,3,7]`
     
         Rules:
     
@@ -56,7 +56,8 @@ class GenerationService:
         * Place the citation immediately after the claim it supports.
         * Ensure citation appears only after completed sentences (after . and ?, not before them)
         * Do not add whitespace inside the source-ID list.
-        * Each source ID may contain only numbers
+        * Source IDs are the numbers in context labels such as `[Source 1]`.
+        * Each source ID may contain only numbers; do not prefix IDs with `s`.
     
         ### Escaping
     
@@ -64,12 +65,12 @@ class GenerationService:
     
         To output citation syntax as literal text, prefix `[[cite]]` with one backslash:
     
-        `\\[[cite]][s1]`
+        `\\[[cite]][1]`
     
         The backslash is special **only when it immediately precedes `[[cite]]`**. Otherwise, preserve backslashes exactly as written, including those in code, file paths, regular expressions, and LaTeX.
     
         Do not use external knowledge to answer the question. If you do not know the answer, send empty response.
-        All parts of your answer must be backed by ciations.
+        All parts of your answer must be backed by citations.
     
         ### Context:
         {context}

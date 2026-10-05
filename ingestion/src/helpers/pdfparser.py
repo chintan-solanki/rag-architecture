@@ -23,7 +23,9 @@ class SectionMetadata:
     file_author: str = ''
     file_length: int = 0 #no of characters in pdf file
     file_total_pages: int = 0 #total pages in the parent document
-    document_id: str = ''
+    
+    document_id: str = '' #document id of the parent document (with ingestion_id prefix)
+    original_file_name: str = '' #original file name of the document (without ingestion_id prefix)
     
 @dataclass
 class MarkdownSection:
@@ -234,11 +236,17 @@ if __name__ == '__main__':
 
     root_dir = Path(__file__).parent.parent.parent.parent
                                
-    file_path = str(root_dir / 'staging/7.4.3.4. 1-Way ANOVA calculations.pdf')
+    file_path = str(root_dir / 'staging/oci-faq.pdf')
 
     print(f'parsing {file_path}')
 
     parser = PdfParser()
     
-    file_metadata, page_offsets, sections = parser.parse(file_path)
-    print(len(sections))
+    file_metadata, page_offsets, sections, hsections = parser.parse(file_path)
+
+    print('printing sections...')
+
+    for section in sections[:3]:
+        print(section.text[:200])
+
+    

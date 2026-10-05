@@ -76,10 +76,12 @@ class RetrievalService:
         def value(*names):
             return next((metadata[n] for n in names if metadata.get(n) is not None), None)
         return Source(
-            id=local_id, text=text or "", chunk_id=value("chunk_id"),
+            id=local_id, text=text or "", 
+            chunk_id=value("chunk_id"),
             document_id=value("document_id", "doc_id"),
             section_title=value("section_title", "section"),
             file_name=value("file_name", "filename"),
+            original_file_name=value("original_file_name"),
             file_title=value("file_title", "title", "document_title"),
             file_author=value("file_author", "author"),
             chunk_start_page_idx=value("chunk_start_page_idx", "start_page_idx"),
