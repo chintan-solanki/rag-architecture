@@ -45,10 +45,6 @@ def events(x_client_id: Annotated[str | None, Header()] = None):
 
         #now stream real time ingestion updates for this client (if redis is available)
         with redis_helper.getpubsub() as pubsub:
-
-            #first stream exisiting incompleted ingestion events for this client
-            for message in document_repository.get_inprogress_ingestions(x_client_id):
-                yield message
     
             if not pubsub:
                 return 

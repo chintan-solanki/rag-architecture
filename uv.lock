@@ -913,6 +913,7 @@ name = "ingestion"
 version = "0.1.0"
 source = { virtual = "ingestion" }
 dependencies = [
+    { name = "certifi" },
     { name = "common" },
     { name = "fastembed" },
     { name = "kafka-python" },
@@ -945,6 +946,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "certifi", specifier = ">=2026.7.22" },
     { name = "common", editable = "common" },
     { name = "fastembed", specifier = ">=0.8.0" },
     { name = "kafka-python", specifier = ">=2.2.15" },

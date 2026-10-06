@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 import http.client
 import json
 from pathlib import PurePath
@@ -95,14 +95,14 @@ class RagApiClient:
         *,
         client_id: str,
         query: str,
-        search_type: str,
-        top_k: int,
+        retrieval_config: Mapping[str, str | int | float | None],
+        generation_config: Mapping[str, str | int | float | None],
     ) -> Iterator[SSEEvent]:
         body = json.dumps(
             {
                 "query": query,
-                "search_type": search_type,
-                "search": {"top_k": top_k},
+                "retrieval_config": retrieval_config,
+                "generation_config": generation_config,
             }
         ).encode()
         request = urllib.request.Request(

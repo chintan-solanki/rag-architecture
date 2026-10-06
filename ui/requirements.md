@@ -164,6 +164,10 @@ The endpoint returns an SSE (`text/event-stream`) response.
 The empty-activity placeholder should be shown only while the activity log has
 no accepted-submission entries or ingestion events.
 
+Provide a **Clear logs** button aligned to the right of the Ingestion Activity
+title. Clicking it should remove the currently displayed activity entries
+without stopping ingestion monitoring or changing document-submission state.
+
 Each event contains information similar to:
 
 ```json
@@ -243,13 +247,17 @@ Conversation history is not required at this stage.
 
 ---
 
-# 8. Search Settings
+# 8. Retrieval Settings
 
-The Search Settings section is displayed above the question input.
+The Retrieval settings section is displayed above the question input.
 
 The following settings are supported:
 
-### 8.1 Search Type
+### 8.1 Retrieval Controls
+
+The first row contains the Retrieval type combobox in the first half of the
+available width. The second half contains the Alpha slider only when retrieval
+type is `hybrid`, with the adjacent text "dense weight, Relative Score Fusion".
 
 Allowed values:
 
@@ -259,15 +267,25 @@ dense
 bm25
 ```
 
-The UI should present these as a selectable control.
+The UI should present these as a selectable control. The selected value is
+stored as `retrieval_config.retrieval_type`.
 
-The selected value is sent to the API as:
+The selected value is sent in the API request as:
 
 ```json
 {
-  "search_type": "<selected value>"
+  "retrieval_config": {
+    "retrieval_type": "<selected value>"
+  }
 }
 ```
+
+The second row contains, from left to right, the Top K combobox, the **Use
+re-ranker** checkbox, and the Candidate pool size field when re-ranking is
+enabled. Re-ranking is enabled by default. Candidate pool size is hidden when
+re-ranking is disabled. Center the re-ranker checkbox within its column.
+The alpha slider ranges from `0` to `1`, defaulting to `0.5`. Candidate pool
+size defaults to `10`; Top K defaults to `3`.
 
 ### 8.2 Top K
 
@@ -276,22 +294,34 @@ The selected value is sent to the API as:
 The allowed range is:
 
 ```text
-1–5
+1–10
 ```
 
-The UI should provide a suitable numeric/select control.
+The UI should provide a combobox.
 
 The selected value is sent as:
 
 ```json
 {
-  "search": {
+  "retrieval_config": {
     "top_k": <value>
   }
 }
 ```
 
-### 8.3 Settings state
+When a field is hidden by the conditional layout, its retrieval config value is
+sent as `null`. The UI includes `use_reranker`, `candidate_pool_size`, and
+`alpha` in `retrieval_config`.
+
+### 8.3 Generation Settings
+
+Show a **Temperature** slider from `0` to `1`, defaulting to `0.1`, and a
+**Top-p** slider from `0.5` to `1.0`, defaulting to `1.0`. Send those values in
+`generation_config` along with `max_output_tokens` (`512`). These settings are
+passed through the API service boundary but are not applied to generation
+behavior yet.
+
+### 8.4 Settings state
 
 Search settings must be maintained as UI state.
 
@@ -328,14 +358,24 @@ The request body should have the following structure:
 ```json
 {
   "query": "<question>",
-  "search_type": "<search type>",
-  "search": {
-    "top_k": 1
+  "retrieval_config": {
+    "retrieval_type": "<retrieval type>",
+    "use_reranker": true,
+    "top_k": 1,
+    "candidate_pool_size": 10,
+    "alpha": 0.5
+  },
+  "generation_config": {
+    "temperature": 0.1,
+    "max_output_tokens": 512,
+    "top_p": 1.0
   }
 }
 ```
 
 The actual `top_k` value comes from the current Search Settings.
+When re-ranking is disabled and retrieval is not hybrid, candidate pool size
+and alpha are sent as `null`.
 
 The `client_id` should also be supplied using the `x_client_id` header if required by the API contract.
 
@@ -667,7 +707,7 @@ Persistent across browser refreshes through local storage.
 
 ### Search state
 
-* `search_type`
+* `retrieval_config.retrieval_type`
 * `top_k`
 
 Persistent for the current application/client session.

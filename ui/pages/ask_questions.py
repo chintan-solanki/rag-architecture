@@ -11,29 +11,112 @@ from ui.api_client import ApiError, RagApiClient
 from ui.components.citations import render_answer_html, source_card_html
 from ui.query_response import ResponseValidationError, validate_query_response
 from ui.sse import SSEDecodeError, decode_json_event
-from ui.state import SEARCH_TYPES
+from ui.state import (
+    DEFAULT_GENERATION_CONFIG,
+    RETRIEVAL_TYPES,
+)
 
 
 def render_ask_questions(api_client: RagApiClient, client_id: str) -> None:
-    st.subheader("Search Settings")
-    settings_left, settings_right = st.columns(2)
-    st.session_state.search_type_widget = st.session_state.search_type
+    st.html(
+        "<style>"
+        "div.st-key-use_reranker_widget div[data-testid='stCheckbox']>label"
+        "{justify-content:center}"
+        "</style>"
+    )
+    st.subheader("Retrieval settings")
+    st.session_state.use_reranker_widget = st.session_state.use_reranker
+    st.session_state.retrieval_type_widget = st.session_state.retrieval_type
+    st.session_state.retrieval_alpha_widget = st.session_state.retrieval_alpha
+    st.session_state.candidate_pool_size_widget = st.session_state.candidate_pool_size
     st.session_state.top_k_widget = st.session_state.top_k
-    with settings_left:
-        search_type = st.selectbox(
-            "Search type",
-            SEARCH_TYPES,
-            key="search_type_widget",
-            on_change=_persist_search_type,
+    st.session_state.generation_temperature_widget = (
+        st.session_state.generation_temperature
+    )
+    st.session_state.generation_top_p_widget = st.session_state.generation_top_p
+
+    retrieval_column, alpha_column = st.columns(2)
+    with retrieval_column:
+        retrieval_type = st.selectbox(
+            "Retrieval type",
+            RETRIEVAL_TYPES,
+            key="retrieval_type_widget",
+            on_change=_persist_retrieval_type,
         )
-    with settings_right:
+    if retrieval_type == "hybrid":
+        with alpha_column:
+            alpha_slider_column, alpha_description_column = st.columns(
+                [0.72, 0.28], vertical_alignment="center"
+            )
+            with alpha_slider_column:
+                alpha = st.slider(
+                    "Alpha",
+                    min_value=0.0,
+                    max_value=1.0,
+                    step=0.05,
+                    key="retrieval_alpha_widget",
+                    on_change=_persist_retrieval_alpha,
+                )
+            with alpha_description_column:
+                st.caption("dense weight, Relative Score Fusion")
+    else:
+        alpha = st.session_state.retrieval_alpha
+
+    top_k_column, reranker_column, candidate_column = st.columns(
+        3, vertical_alignment="center"
+    )
+    with top_k_column:
         top_k = st.selectbox(
             "Top K",
-            range(1, 6),
+            range(1, 11),
             key="top_k_widget",
             on_change=_persist_top_k,
         )
-    st.session_state.search_type = search_type
+    with reranker_column:
+        use_reranker = st.checkbox(
+            "Use re-ranker",
+            key="use_reranker_widget",
+            on_change=_persist_use_reranker,
+        )
+    if use_reranker:
+        with candidate_column:
+            candidate_pool_size = st.number_input(
+                "Candidate pool size",
+                min_value=1,
+                max_value=100,
+                step=1,
+                key="candidate_pool_size_widget",
+                on_change=_persist_candidate_pool_size,
+            )
+    else:
+        candidate_pool_size = None
+
+    st.subheader("Generation Config")
+    temperature_column, top_p_column = st.columns(2)
+    with temperature_column:
+        temperature = st.slider(
+            "Temperature",
+            min_value=0.0,
+            max_value=1.0,
+            step=0.05,
+            key="generation_temperature_widget",
+            on_change=_persist_generation_temperature,
+        )
+    with top_p_column:
+        top_p = st.slider(
+            "Top-p",
+            min_value=0.5,
+            max_value=1.0,
+            step=0.05,
+            key="generation_top_p_widget",
+            on_change=_persist_generation_top_p,
+        )
+
+    st.session_state.use_reranker = use_reranker
+    st.session_state.retrieval_type = retrieval_type
+    st.session_state.retrieval_alpha = alpha
+    if candidate_pool_size is not None:
+        st.session_state.candidate_pool_size = candidate_pool_size
     st.session_state.top_k = top_k
 
     question_column, button_column = st.columns(
@@ -58,12 +141,21 @@ def render_ask_questions(api_client: RagApiClient, client_id: str) -> None:
         if not question.strip():
             st.error("Enter a question before submitting.")
         else:
+            retrieval_config, generation_config = _build_query_configs(
+                retrieval_type=retrieval_type,
+                use_reranker=use_reranker,
+                top_k=top_k,
+                candidate_pool_size=candidate_pool_size,
+                alpha=alpha,
+                temperature=temperature,
+                top_p=top_p,
+            )
             _run_query(
                 api_client,
                 client_id=client_id,
                 question=question,
-                search_type=search_type,
-                top_k=top_k,
+                retrieval_config=retrieval_config,
+                generation_config=generation_config,
             )
             return
 
@@ -71,12 +163,65 @@ def render_ask_questions(api_client: RagApiClient, client_id: str) -> None:
         _render_saved_result()
 
 
-def _persist_search_type() -> None:
-    st.session_state.search_type = st.session_state.search_type_widget
+def _persist_use_reranker() -> None:
+    st.session_state.use_reranker = st.session_state.use_reranker_widget
+
+
+def _persist_retrieval_type() -> None:
+    st.session_state.retrieval_type = st.session_state.retrieval_type_widget
+
+
+def _persist_retrieval_alpha() -> None:
+    st.session_state.retrieval_alpha = st.session_state.retrieval_alpha_widget
+
+
+def _persist_candidate_pool_size() -> None:
+    st.session_state.candidate_pool_size = (
+        st.session_state.candidate_pool_size_widget
+    )
 
 
 def _persist_top_k() -> None:
     st.session_state.top_k = st.session_state.top_k_widget
+
+
+def _persist_generation_temperature() -> None:
+    st.session_state.generation_temperature = (
+        st.session_state.generation_temperature_widget
+    )
+
+
+def _persist_generation_top_p() -> None:
+    st.session_state.generation_top_p = st.session_state.generation_top_p_widget
+
+
+def _build_query_configs(
+    *,
+    retrieval_type: str,
+    use_reranker: bool,
+    top_k: int,
+    candidate_pool_size: int | None,
+    alpha: float,
+    temperature: float,
+    top_p: float,
+) -> tuple[
+    dict[str, str | int | float | bool | None],
+    dict[str, str | int | float | None],
+]:
+    return (
+        {
+            "retrieval_type": retrieval_type,
+            "use_reranker": use_reranker,
+            "top_k": top_k,
+            "candidate_pool_size": candidate_pool_size,
+            "alpha": alpha if retrieval_type == "hybrid" else None,
+        },
+        {
+            **DEFAULT_GENERATION_CONFIG,
+            "temperature": temperature,
+            "top_p": top_p,
+        },
+    )
 
 
 def _run_query(
@@ -84,8 +229,8 @@ def _run_query(
     *,
     client_id: str,
     question: str,
-    search_type: str,
-    top_k: int,
+    retrieval_config: dict[str, str | int | float | bool | None],
+    generation_config: dict[str, str | int | float | None],
 ) -> None:
     st.session_state.current_question = question
     st.session_state.streamed_answer = ""
@@ -100,8 +245,8 @@ def _run_query(
             stream = api_client.iter_query_events(
                 client_id=client_id,
                 query=question,
-                search_type=search_type,
-                top_k=top_k,
+                retrieval_config=retrieval_config,
+                generation_config=generation_config,
             )
             with closing(stream):
                 for event in stream:

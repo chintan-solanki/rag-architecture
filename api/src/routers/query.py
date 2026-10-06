@@ -18,7 +18,11 @@ def get_query_service() -> QueryService:
 @router.post("/query", response_model=QueryResponse)
 def query(request: QueryRequest, service: QueryService = Depends(get_query_service)):
     #try:
-    with trace_span("query", query=request.query, search_type=request.search_type.value):
+    with trace_span(
+        "query",
+        query=request.query,
+        retrieval_type=request.retrieval_config.retrieval_type.value,
+    ):
         return service.query(request)
     # except Exception as exc:        
     #     raise HTTPException(status_code=502, detail="query backend failed") from exc
@@ -30,7 +34,11 @@ def query_stream(request: QueryRequest, service: QueryService = Depends(get_quer
     #define coroutine which yields tokens
     def events():
         try:
-            with trace_span("query.stream", query=request.query, search_type=request.search_type.value):
+            with trace_span(
+                "query.stream",
+                query=request.query,
+                retrieval_type=request.retrieval_config.retrieval_type.value,
+            ):
                 for event, payload in service.stream(request):
                     if event == "completed":
                         payload = payload.model_dump()

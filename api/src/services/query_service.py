@@ -13,7 +13,7 @@ class QueryService:
         self.generation = generation or GenerationService(config)
 
     def _sources(self, request: QueryRequest):
-        results = self.retrieval.retrieve(request.query, request.search_type, request.search.top_k)
+        results = self.retrieval.retrieve(request.query, request.retrieval_config)
         return [item.source if hasattr(item, "source") else item for item in results]
 
     def query(self, request: QueryRequest) -> QueryResponse:
@@ -29,7 +29,9 @@ class QueryService:
             context = self.retrieval.context(sources)
 
             #generate llm response
-            raw = self.generation.generate(request.query, context)
+            raw = self.generation.generate(
+                request.query, context, request.generation_config
+            )
 
             #retrieve citations
             with trace_span('extract citations') as citation_span:
@@ -51,7 +53,9 @@ class QueryService:
             return
         processor = CitationProcessor()
         context = self.retrieval.context(sources)
-        for chunk in self.generation.stream(request.query, context):
+        for chunk in self.generation.stream(
+            request.query, context, request.generation_config
+        ):
             delta = processor.add_chunk(chunk)
             yield "answer_delta", delta
         processor.end_src_stream()

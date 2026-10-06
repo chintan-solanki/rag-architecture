@@ -1,4 +1,23 @@
-from .query import AnswerPart, Citation, QueryRequest, QueryResponse, SearchType, Source
+from .query import (
+    AnswerPart,
+    Citation,
+    GenerationConfig,
+    QueryRequest,
+    QueryResponse,
+    RetrievalConfig,
+    RetrievalType,
+    Source,
+)
 from .documents import DocumentAccepted
 
-__all__ = ["AnswerPart", "Citation", "QueryRequest", "QueryResponse", "SearchType", "Source", "DocumentAccepted"]
+__all__ = [
+    "AnswerPart",
+    "Citation",
+    "GenerationConfig",
+    "QueryRequest",
+    "QueryResponse",
+    "RetrievalConfig",
+    "RetrievalType",
+    "Source",
+    "DocumentAccepted",
+]

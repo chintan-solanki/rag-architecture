@@ -1,5 +1,6 @@
 import os
 from collections.abc import Iterable, Iterator
+from ..models.query import GenerationConfig
 from ..telemetry import trace_span
 
 class GenerationService:
@@ -14,7 +15,12 @@ class GenerationService:
             self._llm = OpenAI(model=self.model, api_key=os.getenv("OPENAI_API_KEY"))
         return self._llm
 
-    def generate(self, query: str, context: str) -> str:
+    def generate(
+        self,
+        query: str,
+        context: str,
+        generation_config: GenerationConfig | None = None,
+    ) -> str:
         with trace_span('call llm') as generate_span:
 
             llm_prompt = self.prompt(query, context)
@@ -27,7 +33,12 @@ class GenerationService:
             })
             return ret
 
-    def stream(self, query: str, context: str) -> Iterator[str]:
+    def stream(
+        self,
+        query: str,
+        context: str,
+        generation_config: GenerationConfig | None = None,
+    ) -> Iterator[str]:
         response = self._get_llm().stream_complete(self.prompt(query, context))
         for chunk in response:
             yield str(getattr(chunk, "delta", getattr(chunk, "text", chunk)))

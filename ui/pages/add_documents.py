@@ -135,7 +135,18 @@ def render_add_documents(api_client: RagApiClient, client_id: str) -> None:
     else:
         _render_url_form(api_client, client_id)
 
-    st.header("Ingestion Activity")
+    activity_title, clear_logs = st.columns(
+        [5, 1], vertical_alignment="center"
+    )
+    with activity_title:
+        st.header("Ingestion Activity")
+    with clear_logs:
+        if st.button(
+            "Clear logs",
+            key="clear_ingestion_logs",
+            use_container_width=True,
+        ):
+            _clear_activity_events(st.session_state.ingestion_events)
     _render_ingestion_activity()
 
 
@@ -229,6 +240,10 @@ def _prepend_activity_entry(
     events: list[dict[str, Any]], event: dict[str, Any]
 ) -> None:
     events.insert(0, event)
+
+
+def _clear_activity_events(events: list[dict[str, Any]]) -> None:
+    events.clear()
 
 
 @st.fragment(run_every=1)

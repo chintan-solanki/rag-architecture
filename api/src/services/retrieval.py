@@ -20,7 +20,7 @@ from llama_index.core import VectorStoreIndex, Settings
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.embeddings.fastembed import FastEmbedEmbedding
 import qdrant_client
-from ..models.query import SearchType, Source
+from ..models.query import RetrievalConfig, RetrievalType, Source
 from ..telemetry import trace_span
 
 @dataclass
@@ -88,18 +88,39 @@ class RetrievalService:
             chunk_end_page_idx=value("chunk_end_page_idx", "end_page_idx"),
         )
 
-    def retrieve(self, query: str, search_type: SearchType = SearchType.hybrid, top_k: int | None = None) -> list[Retrieved]:
+    def retrieve(
+        self,
+        query: str,
+        retrieval_config: RetrievalConfig | None = None,
+    ) -> list[Retrieved]:
         with trace_span('retrieve') as retrieve_span:
 
-            retriever = self._load_index().as_retriever(similarity_top_k=top_k or self.top_k)
+            retrieval_type = (
+                retrieval_config.retrieval_type
+                if retrieval_config is not None
+                else RetrievalType.hybrid
+            )
+            top_k = (
+                retrieval_config.top_k
+                if retrieval_config is not None
+                else None
+            )
+            similarity_top_k = top_k if top_k is not None else self.top_k
+            retriever = self._load_index().as_retriever(
+                similarity_top_k=similarity_top_k
+            )
 
-            # LlamaIndex's configured hybrid vector store selects sparse/dense modes
-            # through alpha; keeping the selection here makes the public API explicit.
-            
-            if search_type == SearchType.bm25:
-                retriever = self._load_index().as_retriever(similarity_top_k=top_k or self.top_k, vector_store_query_mode="sparse")
-            elif search_type == SearchType.dense:
-                retriever = self._load_index().as_retriever(similarity_top_k=top_k or self.top_k, vector_store_query_mode="default")
+            # Candidate-pool sizing and alpha remain pass-through configuration for now.
+            if retrieval_type == RetrievalType.bm25:
+                retriever = self._load_index().as_retriever(
+                    similarity_top_k=similarity_top_k,
+                    vector_store_query_mode="sparse",
+                )
+            elif retrieval_type == RetrievalType.dense:
+                retriever = self._load_index().as_retriever(
+                    similarity_top_k=similarity_top_k,
+                    vector_store_query_mode="default",
+                )
 
             nodes = retriever.retrieve(query)
             print(f'retrieved {len(nodes) if nodes else 0} source nodes')

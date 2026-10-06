@@ -18,7 +18,7 @@ All implementation files and configuration changes belong under `ui/`. The API i
 - The API is mounted under `/api/v1` and exposes:
   - `POST /documents`: multipart form with exactly one of `file` or `url`; responds `202` with `{"ingestion_id": ...}`.
   - `GET /documents/events`: SSE event stream; the current router reads `x_client_id` as a query parameter.
-  - `POST /query/stream`: JSON request with `query`, `search_type`, and nested `search.top_k`; streams `answer_delta`, `completed`, and potentially `error` events.
+  - `POST /query/stream`: JSON request with `query`, `retrieval_config`, and `generation_config`; streams `answer_delta`, `completed`, and potentially `error` events.
 - Ingestion events contain `ingestion_id`, `document_id`, `client_id`, `status`, `stage`, and `error`. The current event route may initially emit in-progress records from storage, then live pub/sub updates. No event ID or replay cursor is defined.
 - The ingestion service requires a non-empty client ID in practice. Always send `x_client_id` on document submission and ingestion-event requests.
 - In the current API router, the upload endpoint's `Header()` parameter uses FastAPI's hyphenated header alias, while the ingestion-event endpoint currently receives `x_client_id` as a query parameter. The UI should send both header spellings and include the query parameter on the event stream until the API contract is aligned.
@@ -65,7 +65,7 @@ Use a single sidebar page selector in the app shell (or an equivalent navigation
    - Upload: `multipart/form-data`, `file` field, `x_client_id` header.
    - URL submission: form-encoded/multipart `url` field, `x_client_id` header.
    - Ingestion events: streaming GET with `x_client_id`.
-   - Query: JSON POST with `query`, `search_type`, and `search: {top_k}`, plus `x_client_id` if following the common request-header convention.
+   - Query: JSON POST with `query`, `retrieval_config`, and `generation_config`, plus `x_client_id` if following the common request-header convention.
 5. Check HTTP status before decoding a success body. For document acceptance, validate that `ingestion_id` is present and non-empty. Surface useful API error detail when available; do not turn malformed or failed responses into success-shaped values.
 6. Keep transport on the Python standard library unless a concrete limitation requires another package; do not add runtime dependencies solely for HTTP or local storage.
 
@@ -74,7 +74,7 @@ Use a single sidebar page selector in the app shell (or an equivalent navigation
 1. Implement browser-local-storage access for `client_id` using a small Streamlit component. Streamlit session state alone is insufficient because it does not persist through a browser refresh.
 2. On first load, read the stored value; if absent, create a UUID in the browser using the browser's cryptographic random UUID facility and persist it. Return the value to Streamlit and cache it in session state for the current run.
 3. Do not render the ID as an editable control. Disable API actions until identity initialization has completed successfully; report identity/component failures rather than submitting requests without a client ID.
-4. Initialize independent session state for `search_type` (default `hybrid`), `top_k` (default within 1–5), current question, streamed text, final structured result, active-query flag, ingestion event list, and ingestion-listener lifecycle.
+4. Initialize independent session state for retrieval and generation settings (retrieval type defaults to `hybrid`, Top K to `3`, candidate pool to `10`, alpha to `0.5`, re-ranking enabled, temperature `0.1`, Top-p `1.0`), current question, streamed text, final structured result, active-query flag, ingestion event list, and ingestion-listener lifecycle.
 5. On page changes, preserve the client identity and search settings. Clear/replace query results only when a new question is submitted. Keep the ingestion event list ephemeral and session-scoped.
 
 ### Step 3 — Sidebar navigation and app shell
@@ -100,22 +100,36 @@ Use a single sidebar page selector in the app shell (or an equivalent navigation
 ### Step 5 — Ask Questions page and query streaming
 
 1. Render **Search Settings** above the question field:
-   - Search type selector with exactly `hybrid`, `dense`, and `bm25`.
-   - `top_k` selector constrained to integers 1–5.
-   - Store both in session state so they survive reruns and page navigation.
+   - First row: retrieval type (`hybrid`, `dense`, `bm25`) in the first half and an alpha slider (`0`–`1`, default `0.5`) in the second half, shown only for hybrid, with the adjacent label "dense weight, Relative Score Fusion".
+   - Second row: Top K combobox (`1`–`10`, default `3`), centered **Use re-ranker** checkbox (default checked), and candidate pool size when re-ranking is enabled. Candidate pool defaults to `10`.
+   - Generation row: temperature slider (`0`–`1`, default `0.1`) and Top-p slider (`0.5`–`1.0`, default `1.0`).
+   - Persist all settings in session state so they survive reruns and page navigation.
 2. Provide a compact multiline question input with placeholder `Ask a question!` and an **Ask question** button to its right. Keep the input about two lines high. Trim only for empty-input validation; submit the user's entered question otherwise.
 3. On valid submission, first replace/clear previous query state, store the submitted question, and mark a query active. Disable Ask until the stream ends or errors.
-4. POST the current question and current settings to `/api/v1/query/stream` using this exact shape:
+4. POST the current question and complete retrieval and generation settings to `/api/v1/query/stream` using this shape:
 
    ```json
    {
      "query": "question text",
-     "search_type": "hybrid",
-     "search": {
-       "top_k": 3
+     "retrieval_config": {
+       "retrieval_type": "hybrid",
+       "use_reranker": true,
+       "top_k": 3,
+       "candidate_pool_size": 10,
+       "alpha": 0.5
+     },
+     "generation_config": {
+       "temperature": 0.1,
+       "max_output_tokens": 512,
+       "top_p": 1.0
      }
    }
    ```
+
+   Set hidden conditional retrieval fields to `null`. The API passes the
+   configurations to the retrieval and generation services, but does not yet
+   apply the candidate-pool, alpha, re-ranker, or generation options to their
+   algorithms.
 
 5. Read and decode SSE events incrementally. Append each `answer_delta.data.text` to the streamed text and immediately rerender the accumulated plain answer. Handle an API `error` event as an incomplete stream failure. Stop at the first valid `completed` event.
 6. On normal stream termination without `completed`, preserve streamed text, display a clear incomplete-answer error, do not create citations/sources, and restore the Ask control. For HTTP errors, display the error in the answer area with no stale prior result.

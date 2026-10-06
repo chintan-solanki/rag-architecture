@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 from urllib.request import Request, urlopen
+import ssl
+import certifi
 
 SRC_DIR = Path(__file__).resolve().parent.parent
 ROOT_DIR = SRC_DIR.parent.parent
@@ -29,6 +31,11 @@ FETCHED_DIR = Path(config['staging']["fetched_dir_path"])
 document_repository = DocumentRepository()
 redis_helper = RedisHelper().__enter__()
 
+# Create a custom SSL context using certifi's bundle
+# this is to avoid certificate verification issues when downloading from HTTPS URLs
+#context = ssl.create_default_context(cafile=certifi.where()) 
+context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+
 def download_document(ingestion_id:str, document_id: str, client_id:str, url: str, destination: Path) -> Path:
     if not ingestion_id or not document_id or not url or not url or not destination:
         raise ValueError("ingestion_id, document_id, url, and destination are all required")
@@ -39,7 +46,8 @@ def download_document(ingestion_id:str, document_id: str, client_id:str, url: st
         raise ValueError("url must be HTTP(S)")
 
     request = Request(url, headers={"User-Agent": "rag-ingestion-downloader"})
-    with urlopen(request, timeout=30) as response:
+    
+    with urlopen(request, timeout=30, context=context) as response:
         content_type = (response.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
         data = response.read()
 
@@ -47,7 +55,6 @@ def download_document(ingestion_id:str, document_id: str, client_id:str, url: st
         raise ValueError(f"URL returned unsupported content type: {content_type or 'missing'}")
     if not data.startswith(b"%PDF"):
         raise ValueError("downloaded content is not a PDF")
-
 
     #copy bytes to the fetched directory
     FETCHED_DIR.mkdir(parents=True, exist_ok=True)
@@ -62,8 +69,11 @@ def main() -> None:
     consumer = kafkahelper.getconsumer(URL_REQUESTED_TOPIC, CONSUMER_GROUP)
     
     for message in consumer:
+        ingestion_document_state = None
+
         event = message.value
         try:
+            
             print(f'download message received: {message}')
 
             ingestion_id = event.get("ingestion_id") 
@@ -74,10 +84,11 @@ def main() -> None:
             dest_file_name = event.get("dest_file_name")
             destination = FETCHED_DIR / dest_file_name
 
+            #create new ingestion document state for this ingestion message
+            ingestion_document_state = IngestionDocumentState(document_repository, redis_helper, ingestion_id, document_id, client_id)
+
             #download to the fetched directory
             download_document(ingestion_id, document_id, client_id, url, destination)
-
-            ingestion_document_state = IngestionDocumentState(document_repository, redis_helper, ingestion_id, document_id, client_id)
 
             #update ingestion record
             ingestion_document_state.RecordState(status='in-progress', stage='document has been downloaded')
@@ -98,10 +109,10 @@ def main() -> None:
         except Exception as exc:
             print(f"Failed to download document {event.get('document_id')}: {exc}")
 
-            #udpate ingestion record
-            ingestion_document_state.RecordState(status='failed', stage='document download failed')
-            
-            
+            # update ingestion record
+            if ingestion_document_state:
+                ingestion_document_state.RecordState(status='failed', stage='document download failed', error=f'{exc}')
+
         finally:
             #todo: add retry logic and/or DLQ processing
             consumer.commit()

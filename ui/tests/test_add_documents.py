@@ -6,6 +6,7 @@ from queue import Empty
 from ui.pages.add_documents import (
     IngestionListener,
     _activity_event_html,
+    _clear_activity_events,
     _decode_ingestion_payload,
     _prepend_activity_entry,
 )
@@ -61,6 +62,13 @@ class IngestionListenerTests(unittest.TestCase):
         self.assertEqual(
             [event["stage"] for event in events], ["newest", "older", "oldest"]
         )
+
+    def test_clear_activity_events_removes_existing_entries(self) -> None:
+        events = [{"stage": "in-progress"}, {"stage": "completed"}]
+
+        _clear_activity_events(events)
+
+        self.assertEqual(events, [])
 
     def test_decodes_fastapi_json_encoded_redis_payload(self) -> None:
         payload = {

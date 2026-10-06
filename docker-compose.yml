@@ -74,14 +74,12 @@ services:
       retries: 10
       
   jaeger:
-    image: jaegertracing/all-in-one:latest
+    image: jaegertracing/jaeger:2.20.0
     container_name: rag-jaeger
     ports:
       - "16686:16686"  # Jaeger Web UI
       - "4317:4317"    # OpenTelemetry Protocol (OTLP) over gRPC
       - "4318:4318"    # OpenTelemetry Protocol (OTLP) over HTTP
-    environment:
-      - COLLECTOR_OTLP_ENABLED=true # Enables OpenTelemetry receivers
     restart: unless-stopped
   
   filewatcher:
@@ -123,6 +121,11 @@ services:
       - type: bind
         source: ./database #points to rag-architecture/database
         target: /app/database
+    environment:
+      - DB_REL_PATH=${DB_REL_PATH}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_DB=${REDIS_DB}
 
   ingestion:
     build:

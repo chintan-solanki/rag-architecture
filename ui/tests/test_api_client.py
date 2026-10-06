@@ -4,6 +4,7 @@ from unittest.mock import patch
 from urllib.parse import parse_qs
 
 from ui.api_client import RagApiClient
+from ui.pages.ask_questions import _build_query_configs
 
 
 class FakeResponse:
@@ -23,6 +24,54 @@ class FakeResponse:
 
 
 class ApiClientTests(unittest.TestCase):
+    def test_query_config_builder_includes_visible_and_default_settings(self) -> None:
+        retrieval_config, generation_config = _build_query_configs(
+            retrieval_type="hybrid",
+            use_reranker=True,
+            top_k=4,
+            candidate_pool_size=12,
+            alpha=0.35,
+            temperature=0.1,
+            top_p=1.0,
+        )
+
+        self.assertEqual(
+            retrieval_config,
+            {
+                "retrieval_type": "hybrid",
+                "use_reranker": True,
+                "top_k": 4,
+                "candidate_pool_size": 12,
+                "alpha": 0.35,
+            },
+        )
+        self.assertEqual(
+            generation_config,
+            {"temperature": 0.1, "max_output_tokens": 512, "top_p": 1.0},
+        )
+
+    def test_non_hybrid_query_omits_hidden_retrieval_fields(self) -> None:
+        retrieval_config, _ = _build_query_configs(
+            retrieval_type="dense",
+            use_reranker=False,
+            top_k=4,
+            candidate_pool_size=None,
+            alpha=0.5,
+            temperature=0.1,
+            top_p=1.0,
+        )
+
+        self.assertEqual(
+            retrieval_config,
+            {
+                "retrieval_type": "dense",
+                "use_reranker": False,
+                "top_k": 4,
+                "candidate_pool_size": None,
+                "alpha": None,
+            },
+        )
+
     @patch("ui.api_client.urllib.request.urlopen")
     def test_url_submission_sends_expected_form_and_client_header(self, urlopen) -> None:
         response = FakeResponse(b'{"ingestion_id":"ing-1"}')
@@ -77,8 +126,18 @@ class ApiClientTests(unittest.TestCase):
             client.iter_query_events(
                 client_id="browser-3",
                 query="What is RAG?",
-                search_type="dense",
-                top_k=4,
+                retrieval_config={
+                    "retrieval_type": "dense",
+                    "use_reranker": False,
+                    "top_k": 4,
+                    "candidate_pool_size": 12,
+                    "alpha": 0.35,
+                },
+                generation_config={
+                    "temperature": 0.4,
+                    "max_output_tokens": 384,
+                    "top_p": 0.85,
+                },
             )
         )
 
@@ -87,8 +146,18 @@ class ApiClientTests(unittest.TestCase):
             json.loads(request.data),
             {
                 "query": "What is RAG?",
-                "search_type": "dense",
-                "search": {"top_k": 4},
+                "retrieval_config": {
+                    "retrieval_type": "dense",
+                    "use_reranker": False,
+                    "top_k": 4,
+                    "candidate_pool_size": 12,
+                    "alpha": 0.35,
+                },
+                "generation_config": {
+                    "temperature": 0.4,
+                    "max_output_tokens": 384,
+                    "top_p": 0.85,
+                },
             },
         )
         self.assertEqual(request.get_header("X_client_id"), "browser-3")
