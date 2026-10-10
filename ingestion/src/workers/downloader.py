@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 from urllib.parse import unquote, urlparse
@@ -36,17 +37,23 @@ redis_helper = RedisHelper().__enter__()
 #context = ssl.create_default_context(cafile=certifi.where()) 
 context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
 
+def safe_file_name(name: str) -> str:
+    clean_name = Path(name).name
+    clean_name = re.sub(r"[^A-Za-z0-9._-]", "_", clean_name)
+    return clean_name if clean_name.lower().endswith(".pdf") else f"{clean_name}.pdf"
+
+
 def download_document(ingestion_id:str, document_id: str, client_id:str, url: str, destination: Path) -> Path:
     if not ingestion_id or not document_id or not url or not url or not destination:
         raise ValueError("ingestion_id, document_id, url, and destination are all required")
-    
+
     parsed = urlparse(url)
     #basic sanity checks
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise ValueError("url must be HTTP(S)")
 
     request = Request(url, headers={"User-Agent": "rag-ingestion-downloader"})
-    
+
     with urlopen(request, timeout=30, context=context) as response:
         content_type = (response.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
         data = response.read()
@@ -56,8 +63,9 @@ def download_document(ingestion_id:str, document_id: str, client_id:str, url: st
     if not data.startswith(b"%PDF"):
         raise ValueError("downloaded content is not a PDF")
 
-    #copy bytes to the fetched directory
+    #copy bytes to the ingestion-specific folder under the fetched directory
     FETCHED_DIR.mkdir(parents=True, exist_ok=True)
+    destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_bytes(data)
 
     return destination
@@ -82,8 +90,9 @@ def main() -> None:
             ingestion_config = event.get("ingestion_config")
             client_id = event.get("client_id")
             url = event.get("url")
-            dest_file_name = event.get("dest_file_name")
-            destination = FETCHED_DIR / dest_file_name
+            dest_file_name = event.get("dest_file_name") or "document.pdf"
+            dest_directory = Path(event.get("dest_directory") or (FETCHED_DIR / ingestion_id))
+            destination = dest_directory / safe_file_name(dest_file_name)
 
             #create new ingestion document state for this ingestion message
             ingestion_document_state = IngestionDocumentState(document_repository, redis_helper, ingestion_id, document_id, client_id)

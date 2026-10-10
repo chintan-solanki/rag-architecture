@@ -36,28 +36,28 @@ class IngestionService:
     async def accept_upload(self, upload: UploadFile, ingestion_config: IngestionConfig, client_id: str) -> str:
         if upload.content_type != "application/pdf" and not (upload.filename or "").lower().endswith(".pdf"):
             raise ValueError("a PDF upload is required")
-        
-        file_stem, file_suffix = upload.filename[:-4], upload.filename[-4:].replace('/', '_')
-        
-        #generate a random ingestion id
+
         ingestion_id = uuid.uuid4().hex
-        document_id = f'{ingestion_id}_{file_stem}'
-        original_file_name = upload.filename
+        document_id = uuid.uuid4().hex
+        original_file_name = upload.filename or "document.pdf"
+        safe_file_name = self._safe_name(original_file_name)
 
         ingestion_document_state = IngestionDocumentState(self.document_repository, self.redis_helper, ingestion_id, document_id, client_id)
 
         #retrieve the file content and check if the file is indeed a pdf
         data = await upload.read()
-        
+
         if not data.startswith(b"%PDF"):
             raise ValueError("uploaded content is not a PDF")
 
         #create ingestion record
         ingestion_document_state.RecordState(status='in-progress', stage='upload_requested')
 
-        #upload the file in fetched directory
+        #upload the file in the ingestion-specific directory under fetched
         self.fetched_dir.mkdir(parents=True, exist_ok=True)
-        destination = self.fetched_dir / f"{ingestion_id}_{self._safe_name(upload.filename or 'document.pdf')}"
+        destination_dir = self.fetched_dir / ingestion_id
+        destination_dir.mkdir(parents=True, exist_ok=True)
+        destination = destination_dir / safe_file_name
         destination.write_bytes(data)
 
         #send kafka document.fetched event directly
@@ -82,29 +82,29 @@ class IngestionService:
         parsed = urlparse(url)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise ValueError("url must be HTTP(S)")
-        
-        #generate a random ingestion id
+
         ingestion_id = uuid.uuid4().hex
-        file_stem = f'{parsed.hostname}{parsed.path}'.replace('/', '_')
-        document_id = f'{ingestion_id}_{file_stem}'
-        dest_file_name = f'{document_id}.pdf'
-        original_file_name = f'{parsed.hostname}{parsed.path}'
+        document_id = uuid.uuid4().hex
+        original_file_name = self._safe_name(f'{parsed.hostname}{parsed.path}' or 'document.pdf')
+        destination_dir = self.fetched_dir / ingestion_id
+        destination_dir.mkdir(parents=True, exist_ok=True)
 
         ingestion_document_state = IngestionDocumentState(self.document_repository, self.redis_helper, ingestion_id, document_id, client_id)
-        
+
         #create ingestion record in db
         ingestion_document_state.RecordState(status='in-progress', stage='url_requested')
-        
-        #publish to kafka 'download_topic' 
+
+        #publish to kafka 'download_topic'
         self.kafkahelper.send_event(self.url_requested_topic, {
             'ingestion_id': ingestion_id,
             'document_id': document_id,
             'ingestion_config': ingestion_config.model_dump(),
             'client_id': client_id,
-            
+
             'original_file_name': original_file_name,
             "url": url,
-            "dest_file_name": dest_file_name
+            "dest_file_name": original_file_name,
+            "dest_directory": str(destination_dir),
             }
         )
 

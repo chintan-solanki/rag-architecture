@@ -55,52 +55,28 @@ def publish_kafka_event(ingestion_id, document_id, original_file_name, client_id
     
     kafkahelper.send_event(DOCUMENT_FETCHED_TOPIC, event)
 
-DOCUMENT_ID_PREFIX = re.compile(r"^(?P<ingestion_id>[0-9a-fA-F]{32})_(?P<original_file_name>.*)$")
+def safe_file_name(name: str) -> str:
+    clean_name = Path(name).name
+    clean_name = re.sub(r"[^A-Za-z0-9._-]", "_", clean_name)
+    return clean_name if clean_name.lower().endswith(".pdf") else f"{clean_name}.pdf"
+
 
 def handle_stable_file(source: Path) -> None:
-    
+
     if not source.exists():
         print("Stable file disappeared before processing: %s", source)
         return
 
     FETCHED_DIR.mkdir(parents=True, exist_ok=True)
 
-    client_id = ''
+    ingestion_id = uuid.uuid4().hex
+    document_id = uuid.uuid4().hex
+    client_id = 'filewatcher'
+    original_file_name = source.name
+    destination_dir = FETCHED_DIR / ingestion_id
+    destination_dir.mkdir(parents=True, exist_ok=True)
+    destination = destination_dir / safe_file_name(original_file_name)
 
-    # check if the file is already in already contains the ingestion_id
-    match = DOCUMENT_ID_PREFIX.match(source.stem)
-    if match:
-        #file came from the api, so file stem is the document_id. use the same file name as the target.
-        document_id = match.group(0)
-        ingestion_id = match.group("ingestion_id")
-        original_file_name = match.group("original_file_name") 
-        
-        dest_name = source.name
-
-        #retrieve client_id from ingestion record.
-        ingestion_record = document_repository.get_ingestion_record(ingestion_id)
-
-        if ingestion_record and ingestion_record.client_id:
-            client_id = ingestion_record.client_id
-
-    else:
-        #the file was copied in incoming directory manually
-
-        #generate a random ingestion id
-        ingestion_id = uuid.uuid4().hex
-
-        #generate document id by combining ingestion id and source file stem
-        document_id = f'{ingestion_id}_{source.stem}'
-
-        client_id = 'filewatcher'
-
-        original_file_name = source.name
-        
-        #dest name is document_id and file  suffix
-        dest_name = f'{document_id}.{source.suffix}'
-
-    destination = FETCHED_DIR / dest_name
-    
     copied, ignored = False, False
 
     #copy from incoming to fetched directory
@@ -124,8 +100,8 @@ def handle_stable_file(source: Path) -> None:
         except Exception as exc:
             print(f"Failed to update ingestion record for {ingestion_id}")
             print(exc)
-            return 
-        
+            return
+
         try:
             #publish kafka event for the copied file
             publish_kafka_event(ingestion_id, document_id, original_file_name, client_id, destination)
@@ -136,7 +112,7 @@ def handle_stable_file(source: Path) -> None:
     #delete the source file after copying or if it was ignored (e.g., zone identifier files)
     if ignored or copied:
         try:
-            source.unlink() 
+            source.unlink()
         except Exception:
             print(
                 "Failed to delete source %s",
