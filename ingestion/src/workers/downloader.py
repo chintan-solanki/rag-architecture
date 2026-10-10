@@ -79,6 +79,7 @@ def main() -> None:
             ingestion_id = event.get("ingestion_id") 
             document_id = event.get("document_id")
             original_file_name = event.get("original_file_name")
+            ingestion_config = event.get("ingestion_config")
             client_id = event.get("client_id")
             url = event.get("url")
             dest_file_name = event.get("dest_file_name")
@@ -98,6 +99,7 @@ def main() -> None:
                 'ingestion_id': ingestion_id,
                 'document_id': document_id,
                 'original_file_name': original_file_name,
+                'ingestion_config': ingestion_config,
                 'client_id': client_id,
 
                 "source_type": "url",

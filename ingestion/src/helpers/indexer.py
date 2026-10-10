@@ -2,23 +2,8 @@ from bisect import bisect_left, bisect_right
 from dataclasses import asdict, dataclass
 from typing import Callable
 from datetime import datetime
-
-
-@dataclass
-class IndexChunk:
-    chunk_id: str
-    text: str
-
-    start_char_idx: int = 0 #start index of chunk in the original pdf file character stream
-    end_char_idx: int = 0 #end index of chunk in the original pdf file character stream
-    start_page_idx: int = 0 #pdf page number index where the chunk starts
-    end_page_idx: int = 0 #pdf page number index where the chunk ends
-
-@dataclass
-class IndexDocument:
-    doc_id: str
-    text:str
-    metadata: any = None
+from pathlib import Path
+import sys
 
 '''
 Returns chunk object for a given llamaindex chunk
@@ -34,6 +19,11 @@ from llama_index.embeddings.fastembed import FastEmbedEmbedding
 import qdrant_client
 from qdrant_client.http import models
 
+SRC_DIR = Path(__file__).resolve().parent.parent
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+from models.ingestion import IndexChunk, IndexDocument
 
 class Indexer:
 
@@ -70,7 +60,9 @@ class Indexer:
             chunk_id = node.metadata['chunk_id']
         )
 
-    def _update_node_metadata(self, node, chunk):
+    def _update_node(self, node, chunk):
+
+        node.text = chunk.text
 
         node.metadata = {
             **node.metadata,
@@ -162,8 +154,8 @@ class Indexer:
             doc_metadata = node.relationships[NodeRelationship.SOURCE].metadata
             chunk = transform_chunk_fn(chunk, doc_metadata)
 
-            #update the node metadata with chunk citation data.
-            self._update_node_metadata(node, chunk)
+            #update the node metadata and text from updated chunk.
+            self._update_node(node, chunk)
             chunks.append(chunk)
 
         batch_size = 8

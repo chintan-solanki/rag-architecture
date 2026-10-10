@@ -10,6 +10,8 @@ from common.helpers.dbrepository import DocumentRepository
 from common.helpers.redishelper import RedisHelper
 from common.helpers.ingestionstate import IngestionDocumentState
 
+from common.models.ingestionconfig import IngestionConfig
+
 class IngestionService:
     def __init__(self, config:Any, fetched_dir:Path):
 
@@ -31,7 +33,7 @@ class IngestionService:
         return name if name.lower().endswith(".pdf") else f"{name}.pdf"
 
     
-    async def accept_upload(self, upload: UploadFile, client_id: str) -> str:
+    async def accept_upload(self, upload: UploadFile, ingestion_config: IngestionConfig, client_id: str) -> str:
         if upload.content_type != "application/pdf" and not (upload.filename or "").lower().endswith(".pdf"):
             raise ValueError("a PDF upload is required")
         
@@ -62,6 +64,7 @@ class IngestionService:
         self.kafkahelper.send_event(self.document_fetched_topic, {
             'ingestion_id': ingestion_id,
             'document_id': document_id,
+            'ingestion_config': ingestion_config.model_dump(),
             'client_id': client_id,
             'original_file_name': original_file_name,
 
@@ -75,7 +78,7 @@ class IngestionService:
 
         return ingestion_id
 
-    def accept_url(self, url: str, client_id: str) -> str:
+    def accept_url(self, url: str, ingestion_config: IngestionConfig, client_id: str) -> str:
         parsed = urlparse(url)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise ValueError("url must be HTTP(S)")
@@ -94,10 +97,12 @@ class IngestionService:
         
         #publish to kafka 'download_topic' 
         self.kafkahelper.send_event(self.url_requested_topic, {
-            "ingestion_id": ingestion_id, 
-            "document_id": document_id, 
-            "client_id" : client_id,
-            "original_file_name": original_file_name,
+            'ingestion_id': ingestion_id,
+            'document_id': document_id,
+            'ingestion_config': ingestion_config.model_dump(),
+            'client_id': client_id,
+            
+            'original_file_name': original_file_name,
             "url": url,
             "dest_file_name": dest_file_name
             }

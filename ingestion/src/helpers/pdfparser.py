@@ -234,19 +234,14 @@ if __name__ == '__main__':
     import os
     from pathlib import Path
 
-    root_dir = Path(__file__).parent.parent.parent.parent
-                               
+    root_dir = Path(__file__).parent.parent.parent.parent                               
     file_path = str(root_dir / 'staging/oci-faq.pdf')
 
     print(f'parsing {file_path}')
 
     parser = PdfParser()
     
-    file_metadata, page_offsets, sections, hsections = parser.parse(file_path)
+    file_metadata, page_offsets, sections = parser.parse(file_path)
 
-    print('printing sections...')
-
-    for section in sections[:3]:
-        print(section.text[:200])
-
+    print(file_metadata)
     

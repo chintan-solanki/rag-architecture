@@ -30,13 +30,16 @@ if str(SRC_DIR) not in sys.path:
 
 from helpers.hasher import DocumentHasher
 from helpers.pdfparser import PdfParser, MarkdownSection
-from helpers.indexer import Indexer, IndexDocument, IndexChunk
+from helpers.indexer import Indexer
+from helpers.chunkcontextretriever import ChunkContextRetriever
+from models.ingestion import IndexDocument, IndexChunk
 
 from common.helpers.ingestionstate import IngestionDocumentState
 from common.helpers.configservice import load_config
 from common.helpers.kafkahelper import KafkaHelper
 from common.helpers.dbrepository import DocumentRepository
 from common.helpers.redishelper import RedisHelper
+from common.models.ingestionconfig import IngestionConfig, ChunkHeaderType
 
 print('ingestion worker up...')
 
@@ -72,12 +75,17 @@ def kafka_commit():
     except BaseException as excp:
         print('error committing message')
 
+
 '''
-This function enriches the chunk with the following citation data
+This function enriches the chunk with the following details
+
+- citation data
     1. start and end character indexes of the chunk in the original pdf file character stream (not the section document stream)
     2. start and end page number of the chunk in the original pdf file
+
+- chunk header for contextual retrieval. The chunk header is generated based on the chunk_header_type specified in the ingestion config. The chunk header can be either a contextualized summary or a section title.
 '''
-def enrich_chunk_with_citation_data(chunk: IndexChunk, metadata: dict, page_offsets: list) -> IndexChunk:
+def enrich_chunk(chunk: IndexChunk, metadata: dict, page_offsets: list, chunk_context_retriever: ChunkContextRetriever) -> IndexChunk:
 
     if chunk and metadata:
         section_start_idx = metadata['section_start_char_idx'] 
@@ -94,6 +102,13 @@ def enrich_chunk_with_citation_data(chunk: IndexChunk, metadata: dict, page_offs
         chunk.start_page_idx = chunk_start_page_idx
         chunk.end_page_idx = chunk_end_page_idx
 
+        #prepend header to the chunk for contextual retrieval.
+        if chunk_context_retriever:
+            #generate chunk header based on the ingestion config
+            chunk_header = chunk_context_retriever.get_chunk_context(chunk, metadata)
+            print(f'chunk header generated: {chunk_header}')
+            chunk.text = f'{chunk_header}<chunk>{chunk.text}</chunk>'
+
     return chunk 
 
 with RedisHelper() as redis_helper:
@@ -109,6 +124,14 @@ with RedisHelper() as redis_helper:
         client_id = message_value.get("client_id")
         original_file_name = message_value.get("original_file_name")
 
+        if message_value.get("ingestion_config", None):
+            ingestion_config = IngestionConfig.model_validate(message_value.get("ingestion_config"))
+        else:
+            ingestion_config = IngestionConfig(chunk_header_type=ChunkHeaderType.metadata)
+
+        chunk_header_type = ingestion_config.chunk_header_type
+
+        #initialize ingestion document state for this ingestion message
         ingestion_document_state = IngestionDocumentState(document_repository, redis_helper, ingestion_id, document_id, client_id)
 
         print(f'message found from kafka.. document_id:{document_id}, doc_path:{dest_file_path}')
@@ -143,7 +166,10 @@ with RedisHelper() as redis_helper:
                 continue
 
         ingestion_document_state.RecordState('in-progress', f'document parsed into sections')
-        
+
+        #create chunk context retriever to generate chunk headers based on the ingestion config
+        chunk_context_retriever = ChunkContextRetriever(chunk_header_type, file_metadata)
+
         with timer('index chunks...'):
 
             try:
@@ -160,7 +186,7 @@ with RedisHelper() as redis_helper:
                 #indexer chunks the documents and indexes them in the vector store.
                 indexer.index(
                     index_docs, 
-                    transform_chunk_fn=lambda c, m: enrich_chunk_with_citation_data(c, m, page_offsets),
+                    transform_chunk_fn=lambda c, m: enrich_chunk(c, m, page_offsets, chunk_context_retriever),
                     )
 
                 print('indexing complete..')

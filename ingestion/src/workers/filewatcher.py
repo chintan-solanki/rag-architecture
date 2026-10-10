@@ -41,15 +41,16 @@ document_repository = DocumentRepository()
 
 def publish_kafka_event(ingestion_id, document_id, original_file_name, client_id, destination):
     event = {
-        "ingestion_id": ingestion_id,
-        "document_id": document_id,
-        "client_id": client_id,
-        "original_file_name": original_file_name,
+        'ingestion_id': ingestion_id,
+        'document_id': document_id,
+        'client_id': client_id,
+        'ingestion_config': None,
+        'original_file_name': original_file_name,
 
-        "source_type": "filewatcher",
-        "dest_file_path": str(destination),
-        "dest_file_name": destination.name,
-        "dest_file_type": destination.suffix,
+        'source_type': "filewatcher",
+        'dest_file_path': str(destination),
+        'dest_file_name': destination.name,
+        'dest_file_type': destination.suffix,
     }
     
     kafkahelper.send_event(DOCUMENT_FETCHED_TOPIC, event)

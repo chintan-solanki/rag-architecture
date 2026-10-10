@@ -37,14 +37,23 @@ COPY .nltk/.nltk_data /app/.nltk_data
 
 COPY pyproject.toml uv.lock ./
 COPY ingestion/pyproject.toml ./ingestion/
+COPY common/pyproject.toml ./common/
 
-COPY common ./common
-RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
+# Download and cache external dependencies (like PyMuPDF)
+# --no-install-workspace prevents uv from looking for the actual code files yet, which are copied later.
+RUN --mount=type=cache,id=ingestion-uv-cache,target=/root/.cache/uv \
     UV_CONCURRENT_BUILDS=1 \
     UV_CONCURRENT_DOWNLOADS=2 \
     UV_CONCURRENT_INSTALLS=2 \
-    uv sync --frozen --package ingestion --no-dev --no-install-project 
+    uv sync --frozen --package ingestion --no-dev --no-install-workspace
 
-
+#copy actual code after the dependencies are installed to avoid cache busting
+COPY common ./common
 COPY ingestion/src ./ingestion/src
+
+# final sync to link the local code
+RUN --mount=type=cache,id=ingestion-uv-cache,target=/root/.cache/uv \
+    uv sync --frozen --package ingestion --no-dev
+
+
 
