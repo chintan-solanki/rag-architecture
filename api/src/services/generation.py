@@ -70,15 +70,18 @@ class GenerationService:
         ### structure of query.
         
         * The user may ask a single query or combine multiple questions into a single query.
-        * In case the query contains multiple questions, it is not necessary that all the questions are related. 
-        * You need to produce answers for each of the questions using the information available in the retrieved sources.
-        * If you cannot answer a specific question reliably using the given information, state so clearly in your answer.
+        * Answer each question independently, whether or not the questions are related.
+        * Answer a question only when the retrieved sources reliably support the answer.
+        * If a question cannot be answered reliably from the retrieved sources, say so briefly and use the null-source marker described below. Do not guess or let an answer to one question influence whether you answer another.
 
         ### Answer rules
         * Do not use external knowledge to answer the question. 
-        * If you do not know the answer to the query or a part of query, state so clearly in the answer.
-        * All parts of your answer must be backed by citations.
+        * Cite every factual claim that is supported by the sources.
+        * An explicit statement that a question cannot be answered from the provided sources is an allowed abstention, not a source-backed factual claim.
             
+        ## Retrieved Sources:
+        {context}
+    
         ### Citation format
             
         `[[cite]][1]`
@@ -97,11 +100,10 @@ class GenerationService:
         * Ensure citation appears only after completed sentences (after . and ?, not before them)
         * Do not add whitespace inside the source-ID list.
         * Each source ID may contain only numbers; do not prefix IDs with `s`.
-        * When you do not know answer to a specific question, state so clearly, and follow it up with citation block [[cite]][0], where 0 represents Null source.        
+        * For an unanswerable question, state that it cannot be answered from the provided sources and follow that statement with the standalone citation block `[[cite]][0]`.
+        * `0` is a special null-source marker, not a source ID. Never combine it with real source IDs or use it to cite a factual claim.
 
-        ## Retrieved Sources:
-        {context}
-    
+        
         ## Query: 
         {query}
     

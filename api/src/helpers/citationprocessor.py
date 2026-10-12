@@ -103,7 +103,6 @@ class CitationProcessor:
 
                     curr_block_end_index = len(self.target_text) + len(extracted_str) 
 
-                    if 
                     citation_obj = (
                         self.curr_target_block_start_index, 
                         curr_block_end_index,

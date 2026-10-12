@@ -2,6 +2,7 @@ import json
 import time
 import unittest
 from queue import Empty
+from unittest.mock import Mock, patch
 
 from ui.pages.add_documents import (
     IngestionListener,
@@ -38,6 +39,18 @@ class ClosingApiClient:
 
 
 class IngestionListenerTests(unittest.TestCase):
+    def test_existing_listener_is_reused_for_same_client(self) -> None:
+        listener = Mock(client_id="client-1")
+        session_state = {"ingestion_listener": listener}
+
+        with patch("ui.pages.add_documents.st.session_state", session_state):
+            from ui.pages.add_documents import ensure_ingestion_listener
+
+            ensure_ingestion_listener(Mock(), "client-1")
+
+        listener.stop.assert_not_called()
+        self.assertIs(session_state["ingestion_listener"], listener)
+
     def test_activity_cards_are_compact_and_escape_event_content(self) -> None:
         rendered = _activity_event_html(
             {

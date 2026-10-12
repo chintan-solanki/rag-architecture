@@ -29,7 +29,8 @@ def render_answer_html(
     max_citation_sources = max((len(part["citations"]) for part in answer), default=0)
     fragments = [_citation_styles()] if max_citation_sources else []
     for part_index, part in enumerate(answer):
-        fragments.append(html.escape(part["text"]))
+        inline_text = part["text"].replace("\r\n", "\n").replace("\r", "\n")
+        fragments.append(_MARKDOWN.renderInline(inline_text.replace("\n", "  \n")))
         citations = part["citations"]
         if not citations:
             continue

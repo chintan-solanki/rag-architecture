@@ -348,10 +348,7 @@ def _render_query_output(
     if not any(part["text"] for part in answer):
         answer_placeholder.info("No answer was returned for this question.")
     else:
-        answer_placeholder.markdown(
-            _answer_html(answer, result["sources"]),
-            unsafe_allow_html=True,
-        )
+        answer_placeholder.html(_answer_html(answer, result["sources"]))
 
     if result["sources"]:
         with source_placeholder.container():

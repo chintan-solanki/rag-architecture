@@ -111,7 +111,7 @@ def enrich_chunk(chunk: IndexChunk, document: IndexDocument, page_offsets: list,
         if chunk_context_retriever:
             #generate chunk header based on the ingestion config and prepend to chunk text.
             chunk_header = chunk_context_retriever.get_chunk_context(chunk, document)
-            chunk.text = f'{chunk_header}\n{chunk.text}'
+            chunk.text = f'{chunk_header}\n<ChunkContent>{chunk.text}</ChunkContent>'
 
     return chunk 
 

@@ -182,7 +182,7 @@ Use the repository's existing Python/uv test workflow and add only focused tests
 1. Configure `RAG_API_BASE_URL`, start the UI, and confirm first-load client ID creation. Refresh and navigate between pages; confirm the browser ID and search settings remain stable.
 2. Submit an invalid file and malformed URL; confirm they are rejected locally and no request is sent.
 3. Submit one PDF upload and one PDF URL in separate operations; confirm API acceptance is acknowledged immediately and each event displays under its own ingestion ID with status styling.
-4. Simulate or cause an ingestion SSE interruption; confirm reconnection is attempted while Add Documents remains active and stops after navigation away.
+4. Navigate between Add Documents and Ask Questions while ingestion events arrive; confirm the listener stays active and events appear when returning to Add Documents. Also simulate an SSE interruption and confirm reconnection.
 5. Ask a non-empty question with each search type and representative top-k values; verify the exact payload and incremental plain-text updates.
 6. Verify completed answer block order, citation labels and hover details, source order/content, and one-based displayed page numbers.
 7. Verify empty answer, no sources, uncited answer blocks, query HTTP error, explicit stream error, early EOF, and malformed completed data. Confirm no previous answer or citation survives a new failed query.
@@ -192,7 +192,7 @@ Use the repository's existing Python/uv test workflow and add only focused tests
 
 - Both sidebar workflows operate end-to-end against the configured API.
 - One stable browser-local client ID is used for ingestion submission and monitoring.
-- Ingestion events append in receive order and reconnect only while the Add Documents page is active.
+- Ingestion events append in receive order, stay buffered across page navigation within the same app session, and reconnect after an SSE interruption.
 - Search settings persist across reruns and page changes; query response is streamed and finalized from the completed event.
 - Citation and source displays honor ordering, optional metadata, empty-result behavior, and page-index conversion.
 - Expected network, stream, and schema errors are visible and do not leave stale or success-shaped output.

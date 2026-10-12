@@ -213,13 +213,53 @@ class CitationRenderingTests(unittest.TestCase):
         rendered = render_answer_html(answer, [source(1)])
 
         self.assertIn("&lt;unsafe&gt;", rendered)
-        self.assertIn("# **literal**", rendered)
-        self.assertIn("**literal**", rendered)
+        self.assertIn("# <strong>literal</strong>", rendered)
         self.assertIn("guide.pdf", rendered)
         self.assertIn('aria-label="guide.pdf"', rendered)
         self.assertIn("<svg", rendered)
         self.assertIn("background:var(--secondary-background-color", rendered)
         self.assertNotIn("<unsafe>", rendered)
+
+    def test_xml_source_content_stays_inside_the_citation_popover(self) -> None:
+        source_text = (
+            "<ChunkContext><summary>Context summary</summary></ChunkContext>\n"
+            "# 1. Who is eligible to apply?\n\n"
+            "A foreign national may apply."
+        )
+
+        rendered = render_answer_html(
+            [{"text": "Supported answer.", "citations": [{"source_id": 1}]}],
+            [source(1, text=source_text)],
+        )
+        answer_text, citation_popover = rendered.split(
+            '<div class="citation-popover"', maxsplit=1
+        )
+
+        self.assertNotIn("Who is eligible to apply?", answer_text)
+        self.assertIn(
+            "&lt;ChunkContext&gt;&lt;summary&gt;Context summary"
+            "&lt;/summary&gt;&lt;/ChunkContext&gt;",
+            citation_popover,
+        )
+        self.assertIn("<h1>1. Who is eligible to apply?</h1>", citation_popover)
+
+    def test_uncited_abstention_text_renders_without_a_citation_badge(self) -> None:
+        answer = [
+            {"text": "Supported claim. ", "citations": [{"source_id": 1}]},
+            {
+                "text": "I cannot answer the other question from the provided sources.",
+                "citations": [],
+            },
+        ]
+
+        rendered = render_answer_html(answer, [source(1)])
+
+        self.assertIn("Supported claim.", rendered)
+        self.assertIn(
+            "I cannot answer the other question from the provided sources.",
+            rendered,
+        )
+        self.assertEqual(rendered.count('class="citation-wrap"'), 1)
 
     def test_source_card_escapes_metadata_and_shows_structured_details(self) -> None:
         item = source(1, filename="<guide>.pdf", text="  First line\n second line ")

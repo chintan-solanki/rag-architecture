@@ -7,7 +7,7 @@ import streamlit as st
 from ui.api_client import RagApiClient
 from ui.components.client_identity import get_browser_client_id
 from ui.config import ConfigurationError, get_api_base_url
-from ui.pages.add_documents import render_add_documents, stop_ingestion_listener
+from ui.pages.add_documents import render_add_documents
 from ui.pages.ask_questions import render_ask_questions
 from ui.state import initialize_state
 
@@ -63,9 +63,5 @@ if not st.session_state.client_id:
     st.stop()
 
 api_client = RagApiClient(api_base_url)
-previous_page = st.session_state.get("_previous_page")
-if previous_page == "Add Documents" and page.title != "Add Documents":
-    stop_ingestion_listener()
-st.session_state._previous_page = page.title
 st.session_state.active_page = page.title
 page.run()

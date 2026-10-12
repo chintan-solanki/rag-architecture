@@ -215,17 +215,17 @@ The UI should not attempt to interpret or modify the API's `stage` message.
 
 ## 6.3 Event stream behavior
 
-The UI should establish the ingestion event stream when the Add Documents page is active.
+The UI should establish the ingestion event stream when the Add Documents page is first opened and keep it active across page navigation within the same app session.
 
-The UI should continue listening for events while the page is active.
+The UI should continue listening for events while either page is active. Events received while Ask Questions is open should be buffered and displayed when the user returns to Add Documents.
 
 If the SSE connection is interrupted, the UI should attempt to reconnect rather than permanently stopping ingestion monitoring.
 
-Because the current event API does not specify event IDs or replay semantics, the UI should treat the event stream as an ephemeral live stream. It is acceptable for events to be lost across a page refresh or a connection interruption.
+Because the current event API does not specify event IDs or replay semantics, the UI should treat the event stream as an ephemeral live stream. It is acceptable for events to be lost across a page refresh or a connection interruption. Events may be buffered in memory during page navigation.
 
 The UI is **not required to reconstruct historical ingestion activity**.
 
-Refreshing the page may clear the previously displayed ingestion log.
+Refreshing the page may clear the previously displayed ingestion log and starts a new event stream.
 
 ---
 
