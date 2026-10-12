@@ -24,23 +24,42 @@ class RagApiClient:
         self.timeout = timeout
 
     def submit_upload(
-        self, *, client_id: str, filename: str, content: bytes, content_type: str
+        self,
+        *,
+        client_id: str,
+        filename: str,
+        content: bytes,
+        content_type: str,
+        chunk_header_type: str = "contextualized_chunk_summary",
+        comment: str | None = None,
     ) -> str:
         boundary = f"----rag-ui-{uuid.uuid4().hex}"
         safe_filename = PurePath(filename).name.replace("\r", "").replace("\n", "")
         safe_filename = safe_filename.replace("\\", "\\\\").replace('"', '\\"')
-        body = b"".join(
+        parts = [
+            f"--{boundary}\r\n".encode(),
             (
-                f"--{boundary}\r\n".encode(),
+                'Content-Disposition: form-data; name="file"; '
+                f'filename="{safe_filename}"\r\n'
+            ).encode(),
+            f"Content-Type: {content_type}\r\n\r\n".encode(),
+            content,
+            b"\r\n",
+        ]
+        fields = {"chunk_header_type": chunk_header_type}
+        if comment is not None:
+            fields["comment"] = comment
+        for name, value in fields.items():
+            parts.extend(
                 (
-                    'Content-Disposition: form-data; name="file"; '
-                    f'filename="{safe_filename}"\r\n'
-                ).encode(),
-                f"Content-Type: {content_type}\r\n\r\n".encode(),
-                content,
-                f"\r\n--{boundary}--\r\n".encode(),
+                    f"--{boundary}\r\n".encode(),
+                    f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode(),
+                    value.encode(),
+                    b"\r\n",
+                )
             )
-        )
+        parts.append(f"--{boundary}--\r\n".encode())
+        body = b"".join(parts)
         request = urllib.request.Request(
             f"{self.base_url}/documents",
             data=body,
@@ -52,8 +71,18 @@ class RagApiClient:
         )
         return self._submit_document(request)
 
-    def submit_url(self, *, client_id: str, url: str) -> str:
-        body = urllib.parse.urlencode({"url": url}).encode()
+    def submit_url(
+        self,
+        *,
+        client_id: str,
+        url: str,
+        chunk_header_type: str = "contextualized_chunk_summary",
+        comment: str | None = None,
+    ) -> str:
+        fields = {"url": url, "chunk_header_type": chunk_header_type}
+        if comment is not None:
+            fields["comment"] = comment
+        body = urllib.parse.urlencode(fields).encode()
         request = urllib.request.Request(
             f"{self.base_url}/documents",
             data=body,

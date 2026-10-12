@@ -22,7 +22,7 @@ class KafkaHelper:
         return self._producer
 
     def send_event(self, topic:str, event: dict[str, Any], retry_cnt=3) -> None:
-        print(f'about to send {event} to topic {topic}')
+        
         for attempt in range(retry_cnt):
             try:
                 future = self.producer.send(topic, value=event)

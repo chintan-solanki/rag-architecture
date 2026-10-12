@@ -5,6 +5,7 @@ import os
 from dotenv import load_dotenv
 import time
 from contextlib import contextmanager
+from dataclasses import asdict
 
 @contextmanager
 def timer(label):
@@ -31,7 +32,7 @@ if str(SRC_DIR) not in sys.path:
 from helpers.hasher import DocumentHasher
 from helpers.pdfparser import PdfParser, MarkdownSection
 from helpers.indexer import Indexer
-from helpers.chunkcontextretriever import ChunkContextRetriever
+from helpers.contextretrieval.chunkcontextretriever import ChunkContextRetriever
 from models.ingestion import IndexDocument, IndexChunk
 
 from common.helpers.ingestionstate import IngestionDocumentState
@@ -83,15 +84,19 @@ This function enriches the chunk with the following details
     1. start and end character indexes of the chunk in the original pdf file character stream (not the section document stream)
     2. start and end page number of the chunk in the original pdf file
 
-- chunk header for contextual retrieval. The chunk header is generated based on the chunk_header_type specified in the ingestion config. The chunk header can be either a contextualized summary or a section title.
-'''
-def enrich_chunk(chunk: IndexChunk, metadata: dict, page_offsets: list, chunk_context_retriever: ChunkContextRetriever) -> IndexChunk:
+- prepends chunk header to the chunk text for contextual retrieval.
 
-    if chunk and metadata:
+'''
+def enrich_chunk(chunk: IndexChunk, document: IndexDocument, page_offsets: list, chunk_context_retriever: ChunkContextRetriever) -> IndexChunk:
+
+    if chunk and document and isinstance(document.metadata, dict):
+
+        metadata = document.metadata
+
         section_start_idx = metadata['section_start_char_idx'] 
 
         chunk_start_idx = section_start_idx + chunk.start_char_idx
-        chunk_end_idx = chunk_start_idx + len(chunk.text) 
+        chunk_end_idx = chunk_start_idx + len(chunk.text)
     
         chunk_start_page_idx = bisect_right(page_offsets, chunk_start_idx) - 1
         chunk_end_page_idx = bisect_left(page_offsets, chunk_end_idx) - 1
@@ -104,10 +109,9 @@ def enrich_chunk(chunk: IndexChunk, metadata: dict, page_offsets: list, chunk_co
 
         #prepend header to the chunk for contextual retrieval.
         if chunk_context_retriever:
-            #generate chunk header based on the ingestion config
-            chunk_header = chunk_context_retriever.get_chunk_context(chunk, metadata)
-            print(f'chunk header generated: {chunk_header}')
-            chunk.text = f'{chunk_header}<chunk>{chunk.text}</chunk>'
+            #generate chunk header based on the ingestion config and prepend to chunk text.
+            chunk_header = chunk_context_retriever.get_chunk_context(chunk, document)
+            chunk.text = f'{chunk_header}\n{chunk.text}'
 
     return chunk 
 
@@ -118,6 +122,8 @@ with RedisHelper() as redis_helper:
 
         message_value = message.value
 
+        print(f'ingestion message received from kafka: {message_value}')
+
         dest_file_path = message_value.get("dest_file_path")
         ingestion_id = message_value.get("ingestion_id")
         document_id = message_value.get("document_id")
@@ -127,9 +133,7 @@ with RedisHelper() as redis_helper:
         if message_value.get("ingestion_config", None):
             ingestion_config = IngestionConfig.model_validate(message_value.get("ingestion_config"))
         else:
-            ingestion_config = IngestionConfig(chunk_header_type=ChunkHeaderType.metadata)
-
-        chunk_header_type = ingestion_config.chunk_header_type
+            ingestion_config = IngestionConfig(chunk_header_type=ChunkHeaderType.file_metadata)
 
         #initialize ingestion document state for this ingestion message
         ingestion_document_state = IngestionDocumentState(document_repository, redis_helper, ingestion_id, document_id, client_id)
@@ -168,7 +172,11 @@ with RedisHelper() as redis_helper:
         ingestion_document_state.RecordState('in-progress', f'document parsed into sections')
 
         #create chunk context retriever to generate chunk headers based on the ingestion config
-        chunk_context_retriever = ChunkContextRetriever(chunk_header_type, file_metadata)
+        chunk_context_retriever = ChunkContextRetriever(
+            ingestion_config,
+            file_metadata,
+            config["llm"]["model"],
+        )
 
         with timer('index chunks...'):
 
@@ -179,14 +187,14 @@ with RedisHelper() as redis_helper:
                     #doc_id is combination of file hash and section text hash
                     doc_id = f'{file_hash}_{hasher.hash_document(section.text.encode())}',
                     text=section.text,
-                    metadata=section.metadata,
+                    metadata= asdict(section.metadata),
                 ) for section in sections if isinstance(section, MarkdownSection)]
 
                 print('calling index method..')                                            
                 #indexer chunks the documents and indexes them in the vector store.
                 indexer.index(
                     index_docs, 
-                    transform_chunk_fn=lambda c, m: enrich_chunk(c, m, page_offsets, chunk_context_retriever),
+                    transform_chunk_fn=lambda c, d: enrich_chunk(c, d, page_offsets, chunk_context_retriever),
                     )
 
                 print('indexing complete..')

@@ -73,15 +73,44 @@ services:
       timeout: 3s
       retries: 10
       
-  jaeger:
-    image: jaegertracing/jaeger:2.20.0
-    container_name: rag-jaeger
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: rag-api
     ports:
-      - "16686:16686"  # Jaeger Web UI
-      - "4317:4317"    # OpenTelemetry Protocol (OTLP) over gRPC
-      - "4318:4318"    # OpenTelemetry Protocol (OTLP) over HTTP
-    restart: unless-stopped
-  
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - HF_TOKEN=${HF_TOKEN}
+      - QDRANT_URL=${QDRANT_URL:-http://qdrant:6333}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_DB=${REDIS_DB}
+    # depends_on:
+    #   qdrant-init:
+    #       condition: service_completed_successfully
+    #   redis:
+    #     condition: service_healthy
+    #   ingestion:
+    #     condition: service_started
+      
+    configs:
+      - source: api_config
+        target: /app/api/config/config.yml
+
+    volumes:
+      - type: bind
+        source: ./staging
+        target: /app/staging
+      - type: bind
+        source: ./.models #points to rag-architecture/.models
+        target: /app/.models
+      - type: bind
+        source: ./database #points to rag-architecture/database/sqlite
+        target: /app/database
+
   filewatcher:
     build:
       context: .
@@ -165,46 +194,6 @@ services:
         source: ./database #points to rag-architecture/database/sqlite
         target: /app/database
 
-  api:
-    build:
-      context: .
-      dockerfile: api/Dockerfile
-    container_name: rag-api
-    ports:
-      - "8000:8000"
-    environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - HF_TOKEN=${HF_TOKEN}
-      - QDRANT_URL=${QDRANT_URL:-http://qdrant:6333}
-      - REDIS_HOST=${REDIS_HOST}
-      - REDIS_PORT=${REDIS_PORT}
-      - REDIS_DB=${REDIS_DB}
-    depends_on:
-      qdrant-init:
-          condition: service_completed_successfully
-      redis:
-        condition: service_healthy
-      ingestion:
-        condition: service_started
-      downloader:
-        condition: service_started
-      filewatcher:
-        condition: service_started
-      
-    configs:
-      - source: api_config
-        target: /app/api/config/config.yml
-
-    volumes:
-      - type: bind
-        source: ./staging
-        target: /app/staging
-      - type: bind
-        source: ./.models #points to rag-architecture/.models
-        target: /app/.models
-      - type: bind
-        source: ./database #points to rag-architecture/database/sqlite
-        target: /app/database
 
   ui:
     build:
@@ -220,6 +209,15 @@ services:
       api:
         condition: service_started
       
+  jaeger:
+    image: jaegertracing/jaeger:2.20.0
+    container_name: rag-jaeger
+    ports:
+      - "16686:16686"  # Jaeger Web UI
+      - "4317:4317"    # OpenTelemetry Protocol (OTLP) over gRPC
+      - "4318:4318"    # OpenTelemetry Protocol (OTLP) over HTTP
+    restart: unless-stopped
+  
 volumes:
   kafka_data:
 

@@ -12,6 +12,7 @@ dependencies = [
     "watchdog>=6.0.0",
     "fastembed>=0.8.0",
     "llama-index>=0.14.24",
+    "llama-index-llms-openai>=0.6.0",
     "llama-index-readers-file>=0.6.0",
     "llama-index-vector-stores-qdrant>=0.10.3",
     "markdown-it-py>=4.2.0",
@@ -21,10 +22,11 @@ dependencies = [
     "common",
     "redis[hiredis]>=8.1.0",
     "certifi>=2026.7.22",
+    "dicttoxml>=1.7.16",
 ]
 
 [build-system]
-requires = ["uv_build>=0.12.3,<0.13.0"]
+requires = ["uv_build>=0.12.3,<0.14.0"]
 build-backend = "uv_build"
 
 [dependency-groups]
@@ -47,4 +49,3 @@ package = false
 
 [tool.uv.sources]
 common = { workspace = true }
-

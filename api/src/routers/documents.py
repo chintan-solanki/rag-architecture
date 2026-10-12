@@ -23,9 +23,19 @@ document_repository = DocumentRepository()
 router = APIRouter()
 
 @router.post("/documents", response_model=DocumentAccepted, status_code=status.HTTP_202_ACCEPTED)
-async def documents(file: UploadFile | None = File(default=None), url: str | None = Form(default=None), x_client_id: Annotated[str | None, Header()] = None):
-
-    ingestion_config = IngestionConfig(chunk_header_type=ChunkHeaderType.contextualized_summary)
+async def documents(
+    file: UploadFile | None = File(default=None),
+    url: str | None = Form(default=None),
+    chunk_header_type: ChunkHeaderType = Form(
+        default=ChunkHeaderType.contextualized_chunk_summary
+    ),
+    comment: str | None = Form(default=None),
+    x_client_id: Annotated[str | None, Header()] = None,
+):
+    ingestion_config = IngestionConfig(
+        chunk_header_type=chunk_header_type,
+        comment=comment,
+    )
     
     if (file is None) == (url is None):
         raise HTTPException(status_code=422, detail="provide exactly one PDF file or URL")

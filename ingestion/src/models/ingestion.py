@@ -14,4 +14,4 @@ class IndexChunk:
 class IndexDocument:
     doc_id: str
     text:str
-    metadata: any = None
+    metadata: dict = None

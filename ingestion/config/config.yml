@@ -3,8 +3,11 @@ kafka:
   document_fetched_topic: 'document.fetched'
 
 qdrant:
-  collection: 'hybrid_collection2'
+  collection: 'hybrid_collection'
   fast_embedding_model: 'BAAI/bge-small-en-v1.5'
+
+llm:
+  model: gpt-4o-mini
 
 staging:
   incoming_dir_rel_path: 'staging/incoming'
@@ -21,4 +24,3 @@ downloader:
   
 ingestion:
   consumer_group: 'ingestion_consumer_group'
-

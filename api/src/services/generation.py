@@ -49,47 +49,63 @@ class GenerationService:
 
         prompt = f'''
         
-        Please answer the query based on the provided context.
-        Every time you use a source text to generate your answer part, you must add the corresponding citation source in the following way.
+        ## Instructions
+
+        Please answer the query based on the provided source chunks (or in short referred as source). 
+        Every time you use a source text to generate your answer part, you must add the corresponding citation in your answer.
         
+        ### Structure of source chunks
+
+        * Each source chunk starts with 'Source [source_id]' line, where source_id is a numeric id of the source. 
+        * Then next few lines contain <ChunkContext>..</ChunkContext> block, which provides summary details about the source chunk.
+        * The actual source chunk text follows.
+
+        ### Validity of Sources.
+        
+        * Do not blindly answer based on the retrieved source chunk.
+        * The source chunks are retrieved by a retrieval system which may retrieve spurious chunks; chunks which match the keywords and structure in the query but may still be completely irrelevant or worse yet, may relate to a completely different entity than the one referred to in the question. 
+        * Use information inside <ChunkContext> to establish and decide if a source chunk is applicable to the question asked and can be used to generate the answer/a part of the answer.
+        * If the question or a part of the question cannot be reliably answered by any of the source chunks, you must state so in your answer.
+
+        ### structure of query.
+        
+        * The user may ask a single query or combine multiple questions into a single query.
+        * In case the query contains multiple questions, it is not necessary that all the questions are related. 
+        * You need to produce answers for each of the questions using the information available in the retrieved sources.
+        * If you cannot answer a specific question reliably using the given information, state so clearly in your answer.
+
+        ### Answer rules
+        * Do not use external knowledge to answer the question. 
+        * If you do not know the answer to the query or a part of query, state so clearly in the answer.
+        * All parts of your answer must be backed by citations.
+            
         ### Citation format
-    
+            
         `[[cite]][1]`
     
         For multiple sources, use a comma-separated list:
     
         `[[cite]][1,3,7]`
     
-        Rules:
-    
+        Here the number(s) inside the single square brackets are the source ids listed against each retrieved source.
+        
+        ### Citation Rules:
+            
         * Cite factual claims when they are supported by the provided sources.
         * Use only source IDs provided in the context. Never invent, modify, or guess a source ID.
         * Place the citation immediately after the claim it supports.
         * Ensure citation appears only after completed sentences (after . and ?, not before them)
         * Do not add whitespace inside the source-ID list.
-        * Source IDs are the numbers in context labels such as `[Source 1]`.
         * Each source ID may contain only numbers; do not prefix IDs with `s`.
-    
-        ### Escaping
-    
-        `[[cite]]` is reserved for citations.
-    
-        To output citation syntax as literal text, prefix `[[cite]]` with one backslash:
-    
-        `\\[[cite]][1]`
-    
-        The backslash is special **only when it immediately precedes `[[cite]]`**. Otherwise, preserve backslashes exactly as written, including those in code, file paths, regular expressions, and LaTeX.
-    
-        Do not use external knowledge to answer the question. If you do not know the answer, send empty response.
-        All parts of your answer must be backed by citations.
-    
-        ### Context:
+        * When you do not know answer to a specific question, state so clearly, and follow it up with citation block [[cite]][0], where 0 represents Null source.        
+
+        ## Retrieved Sources:
         {context}
     
-        ### Query: 
+        ## Query: 
         {query}
     
-        ### Answer:
+        ## Answer:
         '''
         return prompt
         

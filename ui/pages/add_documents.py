@@ -153,6 +153,18 @@ def render_add_documents(api_client: RagApiClient, client_id: str) -> None:
 def _render_upload_form(api_client: RagApiClient, client_id: str) -> None:
     with st.form("pdf_upload_form"):
         uploaded_file = st.file_uploader("Choose a PDF", type=["pdf"])
+        chunk_header_type = st.selectbox(
+            "Chunk header",
+            options=(
+                "contextualized_chunk_summary",
+                "file_metadata",
+            ),
+            format_func=lambda value: {
+                "contextualized_chunk_summary": "Contextualized chunk summary",
+                "file_metadata": "File metadata",
+            }[value],
+        )
+        comment = st.text_area("Comment (optional)")
         submitted = st.form_submit_button(
             "Add PDF", disabled=st.session_state.ingestion_submission_active
         )
@@ -186,6 +198,8 @@ def _render_upload_form(api_client: RagApiClient, client_id: str) -> None:
                 filename=filename,
                 content=content,
                 content_type=content_type or "application/pdf",
+                chunk_header_type=chunk_header_type,
+                comment=comment,
             )
         _record_submission_accepted(ingestion_id)
     except ApiError as exc:
@@ -197,6 +211,18 @@ def _render_upload_form(api_client: RagApiClient, client_id: str) -> None:
 def _render_url_form(api_client: RagApiClient, client_id: str) -> None:
     with st.form("pdf_url_form"):
         url = st.text_input("PDF URL", placeholder="https://example.com/document.pdf")
+        chunk_header_type = st.selectbox(
+            "Chunk header",
+            options=(
+                "contextualized_chunk_summary",
+                "file_metadata",
+            ),
+            format_func=lambda value: {
+                "contextualized_chunk_summary": "Contextualized chunk summary",
+                "file_metadata": "File metadata",
+            }[value],
+        )
+        comment = st.text_area("Comment (optional)")
         submitted = st.form_submit_button(
             "Add PDF URL", disabled=st.session_state.ingestion_submission_active
         )
@@ -217,7 +243,12 @@ def _render_url_form(api_client: RagApiClient, client_id: str) -> None:
     st.session_state.ingestion_submission_active = True
     try:
         with st.spinner("Submitting PDF URL..."):
-            ingestion_id = api_client.submit_url(client_id=client_id, url=value)
+            ingestion_id = api_client.submit_url(
+                client_id=client_id,
+                url=value,
+                chunk_header_type=chunk_header_type,
+                comment=comment,
+            )
         _record_submission_accepted(ingestion_id)
     except ApiError as exc:
         st.error(f"Document submission failed: {exc}")

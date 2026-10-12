@@ -101,7 +101,7 @@ class Indexer:
 
     def index(self, 
               index_docs: list[IndexDocument], 
-              transform_chunk_fn: Callable[[IndexChunk, dict], IndexChunk] = lambda chunk, metadata: chunk,
+              transform_chunk_fn: Callable[[IndexChunk, IndexDocument], IndexChunk] = lambda chunk, doc: chunk,
               *, 
               excluded_embed_keys: list[str] = [], 
               excluded_llm_keys: list[str] = []):
@@ -117,12 +117,14 @@ class Indexer:
 
         print(f'splitting start: {datetime.now()}')
 
+        chunk_to_doc_map = {}
+
         for doc in index_docs:
 
             #create lama_doc
             llama_doc = Document(
                 text=doc.text,
-                metadata=asdict(doc.metadata) if doc.metadata else {},
+                metadata=doc.metadata if doc.metadata else {},
                 excluded_embed_metadata_keys=excluded_embed_keys, 
                 excluded_llm_metadata_keys=excluded_llm_keys
             ) 
@@ -133,7 +135,8 @@ class Indexer:
             #set chunk_id for each node
             for idx, node in enumerate(doc_nodes):
                 node.metadata['chunk_id'] = f'{doc.doc_id}_chunk_{idx}'
-
+                chunk_to_doc_map[node.metadata['chunk_id']] = doc
+                
             nodes.extend(doc_nodes)
 
         print(f'splitting end: {datetime.now()}')
@@ -149,10 +152,11 @@ class Indexer:
         chunks = []
         for node in nodes:
             chunk = self._get_chunk(node)
+            doc = chunk_to_doc_map.get(chunk.chunk_id, None)
+            doc_metadata = node.relationships[NodeRelationship.SOURCE].metadata
 
             #run the app call back to transform the chunk with as per app logic (e.g. adding citation data to the chunk)
-            doc_metadata = node.relationships[NodeRelationship.SOURCE].metadata
-            chunk = transform_chunk_fn(chunk, doc_metadata)
+            chunk = transform_chunk_fn(chunk, doc)
 
             #update the node metadata and text from updated chunk.
             self._update_node(node, chunk)

@@ -8,7 +8,7 @@ class RedisHelper():
 
     def __init__(self, redis_config: Any = None):
 
-        redis_config = redis_config if (redis_config and type(redis_config) == 'dict') else {}
+        redis_config = redis_config if (redis_config and isinstance(redis_config, dict)) else {}
         self.redis_config = redis_config
         self.redis_api = None
 

@@ -88,7 +88,11 @@ class ApiClientTests(unittest.TestCase):
         self.assertEqual(request.get_header("X_client_id"), "browser-1")
         self.assertEqual(request.get_header("X-client-id"), "browser-1")
         self.assertEqual(
-            parse_qs(request.data.decode()), {"url": ["https://example.com/doc.pdf"]}
+            parse_qs(request.data.decode()),
+            {
+                "url": ["https://example.com/doc.pdf"],
+                "chunk_header_type": ["contextualized_chunk_summary"],
+            },
         )
         self.assertTrue(response.closed)
 
@@ -107,6 +111,10 @@ class ApiClientTests(unittest.TestCase):
         request = urlopen.call_args.args[0]
         self.assertEqual(ingestion_id, "ing-2")
         self.assertIn('name="file"; filename="report.pdf"', request.data.decode())
+        self.assertIn(
+            b'name="chunk_header_type"\r\n\r\ncontextualized_chunk_summary',
+            request.data,
+        )
         self.assertIn(b"%PDF-1.7", request.data)
         self.assertEqual(request.get_header("X_client_id"), "browser-2")
         self.assertEqual(request.get_header("X-client-id"), "browser-2")

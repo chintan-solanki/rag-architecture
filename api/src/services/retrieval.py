@@ -128,4 +128,4 @@ class RetrievalService:
 
     @staticmethod
     def context(sources: list[Source]) -> str:
-        return "\n\n".join(f"[Source {source.id}]\n{source.text}" for source in sources)
+        return "\n\n".join(f"Source [{source.id}]\n{source.text}" for source in sources)
