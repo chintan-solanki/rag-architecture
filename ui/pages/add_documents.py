@@ -115,16 +115,32 @@ def ensure_ingestion_listener(api_client: RagApiClient, client_id: str) -> None:
 def render_add_documents(api_client: RagApiClient, client_id: str) -> None:
     ensure_ingestion_listener(api_client, client_id)
 
+    st.subheader("Document source")
     input_method = st.radio(
-        "Document source",
+        "Document source type",
         ("Upload a PDF", "Provide a PDF URL"),
         horizontal=True,
         key="document_input_method",
+        label_visibility="collapsed",
     )
+    uploaded_file = None
+    url = ""
     if input_method == "Upload a PDF":
-        _render_upload_form(api_client, client_id)
+        uploaded_file = st.file_uploader("Choose a PDF", type=["pdf"])
     else:
-        _render_url_form(api_client, client_id)
+        url = st.text_input(
+            "PDF URL", placeholder="https://example.com/document.pdf"
+        )
+
+    chunk_header_type, comment = _render_contextual_retrieval_options()
+    submitted = st.button(
+        "Add PDF", disabled=st.session_state.ingestion_submission_active
+    )
+
+    if submitted and input_method == "Upload a PDF":
+        _submit_upload(api_client, client_id, uploaded_file, chunk_header_type, comment)
+    elif submitted:
+        _submit_url(api_client, client_id, url, chunk_header_type, comment)
 
     activity_title, clear_logs = st.columns(
         [5, 1], vertical_alignment="center"
@@ -141,30 +157,35 @@ def render_add_documents(api_client: RagApiClient, client_id: str) -> None:
     _render_ingestion_activity()
 
 
-def _render_upload_form(api_client: RagApiClient, client_id: str) -> None:
-    with st.form("pdf_upload_form"):
-        uploaded_file = st.file_uploader("Choose a PDF", type=["pdf"])
-        chunk_header_type = st.selectbox(
-            "Chunk header (for contextual retrieval)",
-            options=(
-                "contextualized_chunk_summary",
-                "file_metadata",
-            ),
-            format_func=lambda value: {
-                "contextualized_chunk_summary": (
-                    "Contextualized chunk summary (one LLM summary call per chunk)"
-                ),
-                "file_metadata": "File metadata",
-            }[value],
-        )
-        comment = st.text_area(
-            "Comment (optional document comment added to each chunk)"
-        )
-        submitted = st.form_submit_button(
-            "Add PDF", disabled=st.session_state.ingestion_submission_active
-        )
-    if not submitted:
-        return
+def _render_contextual_retrieval_options() -> tuple[str, str]:
+    st.subheader("Contextual Retrieval")
+    chunk_header_type = st.selectbox(
+        "Chunk header (for contextual retrieval)",
+        options=(
+            "contextualized_chunk_summary",
+            "file_metadata",
+        ),
+        format_func=lambda value: {
+            "contextualized_chunk_summary": "Contextualized LLM chunk summary",
+            "file_metadata": "File metadata",
+        }[value],
+        key="contextual_retrieval_chunk_header_type",
+    )
+    comment = st.text_area(
+        "Comment (optional)",
+        placeholder="Optional document summary added to each chunk",
+        key="contextual_retrieval_comment",
+    )
+    return chunk_header_type, comment
+
+
+def _submit_upload(
+    api_client: RagApiClient,
+    client_id: str,
+    uploaded_file: Any,
+    chunk_header_type: str,
+    comment: str,
+) -> None:
     if uploaded_file is None:
         st.error("Choose a PDF file before submitting.")
         return
@@ -203,31 +224,13 @@ def _render_upload_form(api_client: RagApiClient, client_id: str) -> None:
         st.session_state.ingestion_submission_active = False
 
 
-def _render_url_form(api_client: RagApiClient, client_id: str) -> None:
-    with st.form("pdf_url_form"):
-        url = st.text_input("PDF URL", placeholder="https://example.com/document.pdf")
-        chunk_header_type = st.selectbox(
-            "Chunk header (for contextual retrieval)",
-            options=(
-                "contextualized_chunk_summary",
-                "file_metadata",
-            ),
-            format_func=lambda value: {
-                "contextualized_chunk_summary": (
-                    "Contextualized chunk summary (one LLM summary call per chunk)"
-                ),
-                "file_metadata": "File metadata",
-            }[value],
-        )
-        comment = st.text_area(
-            "Comment (optional document comment added to each chunk)"
-        )
-        submitted = st.form_submit_button(
-            "Add PDF URL", disabled=st.session_state.ingestion_submission_active
-        )
-    if not submitted:
-        return
-
+def _submit_url(
+    api_client: RagApiClient,
+    client_id: str,
+    url: str,
+    chunk_header_type: str,
+    comment: str,
+) -> None:
     value = url.strip()
     try:
         parsed = urlsplit(value)

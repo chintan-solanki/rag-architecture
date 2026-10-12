@@ -88,7 +88,14 @@ The page contains two primary sections:
 
 ## 5.1 Add Document Section
 
-The section allows the user to provide a PDF using one of two methods:
+The section contains two subsections:
+
+1. **Document source** — show a radio selection for uploading a local PDF or providing a PDF URL, followed by the input for the selected method.
+2. **Contextual Retrieval** — show the chunk-header selection and optional comment, which apply to every chunk in the submitted document.
+
+Place a single **Add PDF** button after both subsections. Submitting it sends the selected source and contextual-retrieval settings together.
+
+The document source offers two methods:
 
 * Upload a local PDF file
 * Provide a URL pointing to a PDF

@@ -8,6 +8,7 @@ from ui.pages.add_documents import (
     IngestionListener,
     _activity_event_html,
     _clear_activity_events,
+    _render_contextual_retrieval_options,
     _decode_ingestion_payload,
     _prepend_activity_entry,
 )
@@ -39,6 +40,34 @@ class ClosingApiClient:
 
 
 class IngestionListenerTests(unittest.TestCase):
+    @patch("ui.pages.add_documents.st.text_area", return_value="Comment text")
+    @patch(
+        "ui.pages.add_documents.st.selectbox",
+        return_value="contextualized_chunk_summary",
+    )
+    @patch("ui.pages.add_documents.st.subheader")
+    def test_contextual_retrieval_options_are_shared_outside_forms(
+        self, subheader, selectbox, text_area
+    ) -> None:
+        self.assertEqual(
+            _render_contextual_retrieval_options(),
+            ("contextualized_chunk_summary", "Comment text"),
+        )
+
+        subheader.assert_called_once_with("Contextual Retrieval")
+        self.assertEqual(
+            selectbox.call_args.args[0],
+            "Chunk header (for contextual retrieval)",
+        )
+        self.assertEqual(
+            text_area.call_args,
+            unittest.mock.call(
+                "Comment (optional)",
+                placeholder="Optional document summary added to each chunk",
+                key="contextual_retrieval_comment",
+            ),
+        )
+
     def test_existing_listener_is_reused_for_same_client(self) -> None:
         listener = Mock(client_id="client-1")
         session_state = {"ingestion_listener": listener}
