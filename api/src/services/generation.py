@@ -24,7 +24,9 @@ class GenerationService:
         with trace_span('call llm') as generate_span:
 
             llm_prompt = self.prompt(query, context)
-            response = self._get_llm().complete(llm_prompt)
+            response = self._get_llm().complete(
+                llm_prompt, **self._generation_kwargs(generation_config)
+            )
             ret = str(getattr(response, "text", response))
 
             generate_span.set_attributes({
@@ -39,10 +41,28 @@ class GenerationService:
         context: str,
         generation_config: GenerationConfig | None = None,
     ) -> Iterator[str]:
-        response = self._get_llm().stream_complete(self.prompt(query, context))
+        response = self._get_llm().stream_complete(
+            self.prompt(query, context),
+            **self._generation_kwargs(generation_config),
+        )
         for chunk in response:
             yield str(getattr(chunk, "delta", getattr(chunk, "text", chunk)))
 
+    @staticmethod
+    def _generation_kwargs(
+        generation_config: GenerationConfig | None,
+    ) -> dict[str, float | int]:
+        if generation_config is None:
+            return {}
+
+        kwargs: dict[str, float | int] = {}
+        if generation_config.temperature is not None:
+            kwargs["temperature"] = generation_config.temperature
+        if generation_config.top_p is not None:
+            kwargs["top_p"] = generation_config.top_p
+        if generation_config.max_output_tokens is not None:
+            kwargs["max_tokens"] = generation_config.max_output_tokens
+        return kwargs
 
     @staticmethod
     def prompt(query: str, context: str) -> str:

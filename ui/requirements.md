@@ -325,8 +325,8 @@ sent as `null`. The UI includes `use_reranker`, `candidate_pool_size`, and
 Show a **Temperature** slider from `0` to `1`, defaulting to `0.1`, and a
 **Top-p** slider from `0.5` to `1.0`, defaulting to `1.0`. Send those values in
 `generation_config` along with `max_output_tokens` (`512`). These settings are
-passed through the API service boundary but are not applied to generation
-behavior yet.
+applied by the API to both standard and streamed LLM requests, with
+`max_output_tokens` controlling the output-token limit.
 
 ### 8.4 Settings state
 
