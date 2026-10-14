@@ -16,10 +16,7 @@ def get_query_service() -> QueryService:
 
 
 def _query_span_attributes(request: QueryRequest) -> dict[str, object]:
-    attributes: dict[str, object] = {
-        "query": request.query,
-        "retrieval_type": request.retrieval_config.retrieval_type.value,
-    }
+    attributes: dict[str, object] = {"query": request.query}
     attributes.update(
         {
             f"retrieval.{key}": value
