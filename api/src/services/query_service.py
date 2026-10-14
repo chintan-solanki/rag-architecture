@@ -4,7 +4,7 @@ from ..helpers.citations import answer_parts
 from ..models.query import QueryRequest, QueryResponse
 from .generation import GenerationService
 from .retrieval import RetrievalService
-from ..telemetry import trace_span
+from ..telemetry import telemetry
 
 class QueryService:
     def __init__(self, config, retrieval=None, generation=None):
@@ -18,7 +18,7 @@ class QueryService:
 
     def query(self, request: QueryRequest) -> QueryResponse:
 
-        with trace_span('query') as span:
+        with telemetry.span('query'):
 
             #retrieve rag sources
             sources = self._sources(request)
@@ -34,7 +34,7 @@ class QueryService:
             )
 
             #retrieve citations
-            with trace_span('extract citations') as citation_span:
+            with telemetry.span('extract citations') as citation_span:
             
                 processor = CitationProcessor()
                 processor.add_chunk(raw)

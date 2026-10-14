@@ -23,7 +23,7 @@ from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.embeddings.fastembed import FastEmbedEmbedding
 import qdrant_client
 from ..models.query import RetrievalConfig, RetrievalType, Source
-from ..telemetry import trace_span
+from ..telemetry import telemetry
 
 @dataclass
 class Retrieved:
@@ -121,7 +121,7 @@ class RetrievalService:
         retrieval_config: RetrievalConfig | None = None,
     ) -> list[Retrieved]:
         settings = self._resolve_settings(retrieval_config or RetrievalConfig())
-        with trace_span("retrieve", **settings.span_attributes):
+        with telemetry.span("retrieve", **settings.span_attributes):
             retriever_options: dict[str, Any] = {
                 "similarity_top_k": settings.stage_one_limit
             }

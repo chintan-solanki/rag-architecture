@@ -1,9 +1,9 @@
 import json
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from ..models.query import QueryRequest, QueryResponse
 from ..services.query_service import QueryService
-from ..telemetry import trace_span
+from ..telemetry import telemetry
 from common.helpers.configservice import load_config
 
 router = APIRouter()
@@ -39,7 +39,7 @@ def _query_span_attributes(request: QueryRequest) -> dict[str, object]:
 @router.post("/query", response_model=QueryResponse)
 def query(request: QueryRequest, service: QueryService = Depends(get_query_service)):
     #try:
-    with trace_span("query", **_query_span_attributes(request)):
+    with telemetry.span("query", **_query_span_attributes(request)):
         return service.query(request)
     # except Exception as exc:        
     #     raise HTTPException(status_code=502, detail="query backend failed") from exc
@@ -51,11 +51,17 @@ def query_stream(request: QueryRequest, service: QueryService = Depends(get_quer
     #define coroutine which yields tokens
     def events():
         try:
-            with trace_span("query.stream", **_query_span_attributes(request)):
-                for event, payload in service.stream(request):
-                    if event == "completed":
-                        payload = payload.model_dump()
-                    yield f"event: {event}\ndata: {json.dumps({'text': payload} if event == 'answer_delta' else payload)}\n\n"
+            for event, payload in telemetry.stream(
+                "query.stream",
+                lambda: service.stream(request),
+                _query_span_attributes(request),
+            ):
+                if event == "completed":
+                    payload = payload.model_dump()
+                yield (
+                    f"event: {event}\ndata: "
+                    f"{json.dumps({'text': payload} if event == 'answer_delta' else payload)}\n\n"
+                )
         except Exception:
             yield 'event: error\ndata: {"detail":"query backend failed"}\n\n'
     return StreamingResponse(events(), media_type="text/event-stream")

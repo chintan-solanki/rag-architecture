@@ -1,7 +1,7 @@
 import os
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterator
 from ..models.query import GenerationConfig
-from ..telemetry import trace_span
+from ..telemetry import telemetry
 
 class GenerationService:
     def __init__(self, config, model: str | None = None):
@@ -21,7 +21,7 @@ class GenerationService:
         context: str,
         generation_config: GenerationConfig | None = None,
     ) -> str:
-        with trace_span(
+        with telemetry.span(
             "call llm", **self._generation_attributes(generation_config)
         ) as generate_span:
 
@@ -43,15 +43,14 @@ class GenerationService:
         context: str,
         generation_config: GenerationConfig | None = None,
     ) -> Iterator[str]:
-        with trace_span(
-            "stream llm", **self._generation_attributes(generation_config)
+        prompt = self.prompt(query, context)
+        generation_kwargs = self._generation_kwargs(generation_config)
+        for chunk in telemetry.stream(
+            "stream llm",
+            lambda: self._get_llm().stream_complete(prompt, **generation_kwargs),
+            self._generation_attributes(generation_config),
         ):
-            response = self._get_llm().stream_complete(
-                self.prompt(query, context),
-                **self._generation_kwargs(generation_config),
-            )
-            for chunk in response:
-                yield str(getattr(chunk, "delta", getattr(chunk, "text", chunk)))
+            yield str(getattr(chunk, "delta", getattr(chunk, "text", chunk)))
 
     @staticmethod
     def _generation_attributes(
