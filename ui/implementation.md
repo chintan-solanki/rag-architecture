@@ -100,8 +100,8 @@ Use a single sidebar page selector in the app shell (or an equivalent navigation
 ### Step 5 — Ask Questions page and query streaming
 
 1. Render **Search Settings** above the question field:
-   - First row: retrieval type (`hybrid`, `dense`, `bm25`) in the first half and an alpha slider (`0`–`1`, default `0.5`) in the second half, shown only for hybrid, with the adjacent label "dense weight, Relative Score Fusion".
-   - Second row: Top K combobox (`1`–`10`, default `3`), centered **Use re-ranker** checkbox (default checked), and candidate pool size when re-ranking is enabled. Candidate pool defaults to `10`.
+   - First row: Top K combobox (`1`–`10`, default `3`), retrieval type (`hybrid`, `dense`, `bm25`), and alpha slider (`0`–`1`, default `0.5`) shown only for hybrid. Put "Dense weight for Relative Score Fusion" in the alpha slider tooltip.
+   - Second row: **Use re-ranker** checkbox (default checked), candidate pool size, and re-ranker score threshold slider when re-ranking is enabled. Candidate pool defaults to `10`; hide its controls when re-ranking is disabled. Center the checkbox within its column.
    - Generation row: temperature slider (`0`–`1`, default `0.1`) and Top-p slider (`0.5`–`1.0`, default `1.0`).
    - Persist all settings in session state so they survive reruns and page navigation.
 2. Provide a compact multiline question input with placeholder `Ask a question!` and an **Ask question** button to its right. Keep the input about two lines high. Trim only for empty-input validation; submit the user's entered question otherwise.

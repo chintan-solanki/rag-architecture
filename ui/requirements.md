@@ -287,12 +287,17 @@ The selected value is sent in the API request as:
 }
 ```
 
-The second row contains, from left to right, the Top K combobox, the **Use
-re-ranker** checkbox, and the Candidate pool size field when re-ranking is
-enabled. Re-ranking is enabled by default. Candidate pool size is hidden when
-re-ranking is disabled. Center the re-ranker checkbox within its column.
-The alpha slider ranges from `0` to `1`, defaulting to `0.5`. Candidate pool
-size defaults to `10`; Top K defaults to `3`.
+Show retrieval settings in two rows of three columns. The first row contains,
+from left to right, the Top K combobox, Retrieval type combobox, and the Alpha
+slider when hybrid retrieval is selected. The Alpha tooltip should explain
+"Dense weight for Relative Score Fusion." The alpha slider ranges from `0` to
+`1`, defaulting to `0.5`; Top K defaults to `3`.
+
+The second row contains, from left to right, the **Use re-ranker** checkbox,
+Candidate pool size field, and Re-ranker score threshold slider when re-ranking
+is enabled. Re-ranking is enabled by default. Candidate pool size and score
+threshold are hidden when re-ranking is disabled. Center the re-ranker
+checkbox within its column. Candidate pool size defaults to `10`.
 
 ### 8.2 Top K
 

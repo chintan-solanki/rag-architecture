@@ -38,34 +38,7 @@ def render_ask_questions(api_client: RagApiClient, client_id: str) -> None:
     )
     st.session_state.generation_top_p_widget = st.session_state.generation_top_p
 
-    retrieval_column, alpha_column = st.columns(2)
-    with retrieval_column:
-        retrieval_type = st.selectbox(
-            "Retrieval type",
-            RETRIEVAL_TYPES,
-            key="retrieval_type_widget",
-            on_change=_persist_retrieval_type,
-        )
-    if retrieval_type == "hybrid":
-        with alpha_column:
-            alpha_slider_column, alpha_description_column = st.columns(
-                [0.72, 0.28], vertical_alignment="center"
-            )
-            with alpha_slider_column:
-                alpha = st.slider(
-                    "Alpha",
-                    min_value=0.0,
-                    max_value=1.0,
-                    step=0.05,
-                    key="retrieval_alpha_widget",
-                    on_change=_persist_retrieval_alpha,
-                )
-            with alpha_description_column:
-                st.caption("dense weight, Relative Score Fusion")
-    else:
-        alpha = st.session_state.retrieval_alpha
-
-    top_k_column, reranker_column, candidate_column = st.columns(
+    top_k_column, retrieval_column, alpha_column = st.columns(
         3, vertical_alignment="center"
     )
     with top_k_column:
@@ -75,6 +48,30 @@ def render_ask_questions(api_client: RagApiClient, client_id: str) -> None:
             key="top_k_widget",
             on_change=_persist_top_k,
         )
+    with retrieval_column:
+        retrieval_type = st.selectbox(
+            "Retrieval type",
+            RETRIEVAL_TYPES,
+            key="retrieval_type_widget",
+            on_change=_persist_retrieval_type,
+        )
+    if retrieval_type == "hybrid":
+        with alpha_column:
+            alpha = st.slider(
+                "Alpha",
+                min_value=0.0,
+                max_value=1.0,
+                step=0.05,
+                key="retrieval_alpha_widget",
+                on_change=_persist_retrieval_alpha,
+                help="Dense weight for Relative Score Fusion.",
+            )
+    else:
+        alpha = st.session_state.retrieval_alpha
+
+    reranker_column, candidate_column, threshold_column = st.columns(
+        3, vertical_alignment="center"
+    )
     with reranker_column:
         use_reranker = st.checkbox(
             "Use re-ranker",
@@ -95,21 +92,22 @@ def render_ask_questions(api_client: RagApiClient, client_id: str) -> None:
         candidate_pool_size = None
 
     if use_reranker:
-        reranker_score_threshold = st.slider(
-            "Re-ranker score threshold",
-            min_value=0.0,
-            max_value=1.0,
-            step=0.05,
-            key="reranker_score_threshold_widget",
-            on_change=_persist_reranker_score_threshold,
-            help=(
-                "Filters candidates using the sigmoid of the re-ranker's raw "
-                "score. This is not a probability or confidence estimate. "
-                "Increasing the threshold may filter out more sources with "
-                "weaker relevance scores. At 1.0, no finite score passes, "
-                "so the result may contain no sources."
-            ),
-        )
+        with threshold_column:
+            reranker_score_threshold = st.slider(
+                "Re-ranker score threshold",
+                min_value=0.0,
+                max_value=1.0,
+                step=0.05,
+                key="reranker_score_threshold_widget",
+                on_change=_persist_reranker_score_threshold,
+                help=(
+                    "Filters candidates using the sigmoid of the re-ranker's "
+                    "raw score. This is not a probability or confidence "
+                    "estimate. Increasing the threshold may filter out more "
+                    "sources with weaker relevance scores. At 1.0, no finite "
+                    "score passes, so the result may contain no sources."
+                ),
+            )
     else:
         reranker_score_threshold = st.session_state.reranker_score_threshold
 
