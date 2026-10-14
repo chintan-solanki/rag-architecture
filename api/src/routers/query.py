@@ -15,14 +15,34 @@ def get_query_service() -> QueryService:
     return _service
 
 
+def _query_span_attributes(request: QueryRequest) -> dict[str, object]:
+    attributes: dict[str, object] = {
+        "query": request.query,
+        "retrieval_type": request.retrieval_config.retrieval_type.value,
+    }
+    attributes.update(
+        {
+            f"retrieval.{key}": value
+            for key, value in request.retrieval_config.model_dump(
+                mode="json", exclude_none=True
+            ).items()
+        }
+    )
+    attributes.update(
+        {
+            f"generation.{key}": value
+            for key, value in request.generation_config.model_dump(
+                exclude_none=True
+            ).items()
+        }
+    )
+    return attributes
+
+
 @router.post("/query", response_model=QueryResponse)
 def query(request: QueryRequest, service: QueryService = Depends(get_query_service)):
     #try:
-    with trace_span(
-        "query",
-        query=request.query,
-        retrieval_type=request.retrieval_config.retrieval_type.value,
-    ):
+    with trace_span("query", **_query_span_attributes(request)):
         return service.query(request)
     # except Exception as exc:        
     #     raise HTTPException(status_code=502, detail="query backend failed") from exc
@@ -34,11 +54,7 @@ def query_stream(request: QueryRequest, service: QueryService = Depends(get_quer
     #define coroutine which yields tokens
     def events():
         try:
-            with trace_span(
-                "query.stream",
-                query=request.query,
-                retrieval_type=request.retrieval_config.retrieval_type.value,
-            ):
+            with trace_span("query.stream", **_query_span_attributes(request)):
                 for event, payload in service.stream(request):
                     if event == "completed":
                         payload = payload.model_dump()

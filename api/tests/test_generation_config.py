@@ -67,6 +67,16 @@ class GenerationConfigTests(unittest.TestCase):
             (self.service.prompt("question", "context"), {}),
         )
 
+    def test_generation_attributes_use_api_config_names(self) -> None:
+        self.assertEqual(
+            self.service._generation_attributes(self.generation_config),
+            {
+                "temperature": 0.4,
+                "max_output_tokens": 384,
+                "top_p": 0.85,
+            },
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

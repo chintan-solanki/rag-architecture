@@ -93,19 +93,23 @@ class RetrievalService:
         query: str,
         retrieval_config: RetrievalConfig | None = None,
     ) -> list[Retrieved]:
-        with trace_span('retrieve') as retrieve_span:
+        retrieval_type = (
+            retrieval_config.retrieval_type
+            if retrieval_config is not None
+            else RetrievalType.hybrid
+        )
+        top_k = retrieval_config.top_k if retrieval_config is not None else None
+        similarity_top_k = top_k if top_k is not None else self.top_k
+        span_attributes: dict[str, object] = {
+            "retrieval_type": retrieval_type.value,
+            "top_k": similarity_top_k,
+        }
+        if retrieval_config is not None:
+            span_attributes.update(
+                retrieval_config.model_dump(mode="json", exclude_none=True)
+            )
 
-            retrieval_type = (
-                retrieval_config.retrieval_type
-                if retrieval_config is not None
-                else RetrievalType.hybrid
-            )
-            top_k = (
-                retrieval_config.top_k
-                if retrieval_config is not None
-                else None
-            )
-            similarity_top_k = top_k if top_k is not None else self.top_k
+        with trace_span("retrieve", **span_attributes):
             retriever = self._load_index().as_retriever(
                 similarity_top_k=similarity_top_k
             )

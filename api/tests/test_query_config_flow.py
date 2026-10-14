@@ -7,6 +7,7 @@ from api.src.models.query import (
     RetrievalType,
     Source,
 )
+from api.src.routers.query import _query_span_attributes
 from api.src.services.query_service import QueryService
 
 
@@ -79,6 +80,18 @@ class QueryConfigFlowTests(unittest.TestCase):
 
         self.assertEqual(self.retrieval.received_config, self.retrieval_config)
         self.assertEqual(self.generation.stream_config, self.generation_config)
+
+    def test_query_span_attributes_include_both_configs(self) -> None:
+        attributes = _query_span_attributes(self.request)
+
+        self.assertEqual(attributes["retrieval.retrieval_type"], "dense")
+        self.assertEqual(attributes["retrieval.use_reranker"], False)
+        self.assertEqual(attributes["retrieval.top_k"], 4)
+        self.assertEqual(attributes["retrieval.candidate_pool_size"], 12)
+        self.assertEqual(attributes["retrieval.alpha"], 0.35)
+        self.assertEqual(attributes["generation.temperature"], 0.4)
+        self.assertEqual(attributes["generation.max_output_tokens"], 384)
+        self.assertEqual(attributes["generation.top_p"], 0.85)
 
 
 if __name__ == "__main__":

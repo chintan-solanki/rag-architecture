@@ -21,7 +21,9 @@ class GenerationService:
         context: str,
         generation_config: GenerationConfig | None = None,
     ) -> str:
-        with trace_span('call llm') as generate_span:
+        with trace_span(
+            "call llm", **self._generation_attributes(generation_config)
+        ) as generate_span:
 
             llm_prompt = self.prompt(query, context)
             response = self._get_llm().complete(
@@ -41,12 +43,23 @@ class GenerationService:
         context: str,
         generation_config: GenerationConfig | None = None,
     ) -> Iterator[str]:
-        response = self._get_llm().stream_complete(
-            self.prompt(query, context),
-            **self._generation_kwargs(generation_config),
-        )
-        for chunk in response:
-            yield str(getattr(chunk, "delta", getattr(chunk, "text", chunk)))
+        with trace_span(
+            "stream llm", **self._generation_attributes(generation_config)
+        ):
+            response = self._get_llm().stream_complete(
+                self.prompt(query, context),
+                **self._generation_kwargs(generation_config),
+            )
+            for chunk in response:
+                yield str(getattr(chunk, "delta", getattr(chunk, "text", chunk)))
+
+    @staticmethod
+    def _generation_attributes(
+        generation_config: GenerationConfig | None,
+    ) -> dict[str, float | int]:
+        if generation_config is None:
+            return {}
+        return generation_config.model_dump(exclude_none=True)
 
     @staticmethod
     def _generation_kwargs(
