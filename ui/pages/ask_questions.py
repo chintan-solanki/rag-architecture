@@ -29,6 +29,9 @@ def render_ask_questions(api_client: RagApiClient, client_id: str) -> None:
     st.session_state.retrieval_type_widget = st.session_state.retrieval_type
     st.session_state.retrieval_alpha_widget = st.session_state.retrieval_alpha
     st.session_state.candidate_pool_size_widget = st.session_state.candidate_pool_size
+    st.session_state.reranker_score_threshold_widget = (
+        st.session_state.reranker_score_threshold
+    )
     st.session_state.top_k_widget = st.session_state.top_k
     st.session_state.generation_temperature_widget = (
         st.session_state.generation_temperature
@@ -91,6 +94,25 @@ def render_ask_questions(api_client: RagApiClient, client_id: str) -> None:
     else:
         candidate_pool_size = None
 
+    if use_reranker:
+        reranker_score_threshold = st.slider(
+            "Re-ranker score threshold",
+            min_value=0.0,
+            max_value=1.0,
+            step=0.05,
+            key="reranker_score_threshold_widget",
+            on_change=_persist_reranker_score_threshold,
+            help=(
+                "Filters candidates using the sigmoid of the re-ranker's raw "
+                "score. This is not a probability or confidence estimate. "
+                "Increasing the threshold may filter out more sources with "
+                "weaker relevance scores. At 1.0, no finite score passes, "
+                "so the result may contain no sources."
+            ),
+        )
+    else:
+        reranker_score_threshold = st.session_state.reranker_score_threshold
+
     st.subheader("Generation Config")
     temperature_column, top_p_column = st.columns(2)
     with temperature_column:
@@ -146,6 +168,7 @@ def render_ask_questions(api_client: RagApiClient, client_id: str) -> None:
                 use_reranker=use_reranker,
                 top_k=top_k,
                 candidate_pool_size=candidate_pool_size,
+                reranker_score_threshold=reranker_score_threshold,
                 alpha=alpha,
                 temperature=temperature,
                 top_p=top_p,
@@ -181,6 +204,12 @@ def _persist_candidate_pool_size() -> None:
     )
 
 
+def _persist_reranker_score_threshold() -> None:
+    st.session_state.reranker_score_threshold = (
+        st.session_state.reranker_score_threshold_widget
+    )
+
+
 def _persist_top_k() -> None:
     st.session_state.top_k = st.session_state.top_k_widget
 
@@ -201,6 +230,7 @@ def _build_query_configs(
     use_reranker: bool,
     top_k: int,
     candidate_pool_size: int | None,
+    reranker_score_threshold: float = 0.5,
     alpha: float,
     temperature: float,
     top_p: float,
@@ -214,6 +244,9 @@ def _build_query_configs(
             "use_reranker": use_reranker,
             "top_k": top_k,
             "candidate_pool_size": candidate_pool_size,
+            "reranker_score_threshold": (
+                reranker_score_threshold if use_reranker else None
+            ),
             "alpha": alpha if retrieval_type == "hybrid" else None,
         },
         {

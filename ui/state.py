@@ -7,6 +7,7 @@ DEFAULT_TOP_K = 3
 RETRIEVAL_TYPES = ("hybrid", "dense", "bm25")
 DEFAULT_CANDIDATE_POOL_SIZE = 10
 DEFAULT_RETRIEVAL_ALPHA = 0.5
+DEFAULT_RERANKER_SCORE_THRESHOLD = 0.5
 DEFAULT_GENERATION_CONFIG = {
     "temperature": 0.1,
     "max_output_tokens": 512,
@@ -25,6 +26,7 @@ def initialize_state(session_state: Any) -> None:
         "use_reranker": True,
         "top_k": DEFAULT_TOP_K,
         "candidate_pool_size": DEFAULT_CANDIDATE_POOL_SIZE,
+        "reranker_score_threshold": DEFAULT_RERANKER_SCORE_THRESHOLD,
         "retrieval_alpha": DEFAULT_RETRIEVAL_ALPHA,
         "generation_temperature": DEFAULT_GENERATION_CONFIG["temperature"],
         "generation_top_p": DEFAULT_GENERATION_CONFIG["top_p"],

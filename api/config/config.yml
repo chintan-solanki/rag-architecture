@@ -12,8 +12,15 @@ staging:
   incoming_dir_rel_path: staging/incoming
   fetched_dir_rel_path: staging/fetched
 retrieval:
+  retrieval_type: hybrid
+  use_reranker: true
   top_k: 5
+  candidate_pool_size: 10
+  reranker_score_threshold: 0.5
+  alpha: 0.5
   embedding_model_cache_dir_name: 'embeddings'
+  reranker:
+    model: 'Xenova/ms-marco-MiniLM-L-6-v2'
 llm:
   model: gpt-4o-mini
   

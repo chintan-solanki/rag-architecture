@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import math
 import re
 from typing import Any
 
@@ -34,15 +35,13 @@ def render_answer_html(
         citations = part["citations"]
         if not citations:
             continue
-        label = citation_label(citations, sources_by_id)
-        fragments.append(_citation_popover(citations, sources_by_id, label, part_index))
+        fragments.append(_citation_popover(citations, sources_by_id, part_index))
     return "".join(fragments)
 
 
 def _citation_popover(
     citations: list[dict[str, Any]],
     sources_by_id: dict[int, dict[str, Any]],
-    label: str,
     citation_index: int,
 ) -> str:
     source_ids = [item["source_id"] for item in citations]
@@ -117,7 +116,8 @@ def _citation_source_html(source: dict[str, Any]) -> str:
     source_text = source.get("text", "")
     parts = [
         '<div class="citation-source-details">'
-        f'<div class="citation-source-filename">{_source_icon()}{filename}</div>'
+        f'<div class="citation-source-filename">{_source_icon()}{filename}'
+        f'{_relevance_score_html(source)}</div>'
     ]
     if title:
         parts.append(f'<strong class="citation-source-title">{html.escape(title)}</strong>')
@@ -194,6 +194,9 @@ text-decoration:none}
 .citation-source-filename{display:flex;align-items:center;gap:.45rem;color:var(--text-color,#31333f);
 opacity:.65;font-size:.9rem;overflow-wrap:anywhere}
 .citation-source-filename .citation-icon{color:var(--primary-color,#ff4b4b)}
+.relevance-score{flex:none;margin-left:auto;padding:.12rem .4rem;border-radius:.45rem;
+background:var(--secondary-background-color,#f0f2f6);color:var(--text-color,#31333f);
+font-size:.78em;white-space:nowrap}
 .citation-source-title{font-weight:600}
 .citation-source-page{color:var(--text-color,#31333f);opacity:.65;font-size:.88rem}
 .citation-source-text{color:var(--text-color,#31333f);opacity:.68;overflow-wrap:anywhere}
@@ -239,6 +242,9 @@ def source_card_html(source: dict[str, Any]) -> str:
         '.source-markdown h1,.source-markdown h2,.source-markdown h3,'
         '.source-markdown h4,.source-markdown h5,.source-markdown h6{'
         'font-size:1.15rem!important;line-height:1.3!important;margin:.5rem 0!important}'
+        '.relevance-score{flex:none;padding:.12rem .4rem;border-radius:.45rem;'
+        'background:var(--secondary-background-color,#f0f2f6);'
+        'color:var(--text-color,#31333f);font-size:.78em;white-space:nowrap}'
         '.source-markdown h1,.source-markdown h2{font-weight:650}</style>',
         '<article style="box-sizing:border-box;width:100%;margin:0 0 .75rem;'
         'padding:.9rem 1rem;border:1px solid '
@@ -250,6 +256,7 @@ def source_card_html(source: dict[str, Any]) -> str:
         'gap:.65rem;min-width:0">'
         f'<strong style="min-width:0;flex:1;font-size:.95em;overflow-wrap:anywhere">'
         f"{html.escape(filename)}</strong>"
+        f"{_relevance_score_html(source)}"
     ]
     if page_range:
         details.append(
@@ -263,6 +270,22 @@ def source_card_html(source: dict[str, Any]) -> str:
         f"{_render_markdown(text)}</div></article>"
     )
     return "".join(details)
+
+
+def _relevance_score_html(source: dict[str, Any]) -> str:
+    score = source.get("relevance_score")
+    if (
+        not isinstance(score, (int, float))
+        or isinstance(score, bool)
+        or not math.isfinite(score)
+        or not 0.0 <= score <= 1.0
+    ):
+        return ""
+    return (
+        '<span class="relevance-score" title="Sigmoid re-ranker score; '
+        'not a probability or confidence estimate">'
+        f"Relevance {score:.2f}</span>"
+    )
 
 
 def citation_source_details(

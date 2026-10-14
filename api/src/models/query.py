@@ -1,5 +1,4 @@
 from enum import Enum
-from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -9,11 +8,12 @@ class RetrievalType(str, Enum):
     hybrid = "hybrid"
 
 class RetrievalConfig(BaseModel):
-    retrieval_type: RetrievalType = RetrievalType.hybrid
-    use_reranker: bool = True
-    top_k: int | None = Field(default=3, ge=1, le=10)
-    candidate_pool_size: int | None = Field(default=10, ge=1, le=100)
-    alpha: float | None = Field(default=0.5, ge=0.0, le=1.0)
+    retrieval_type: RetrievalType | None = None
+    use_reranker: bool | None = None
+    top_k: int | None = Field(default=None, ge=1, le=10)
+    candidate_pool_size: int | None = Field(default=None, ge=1, le=100)
+    reranker_score_threshold: float | None = Field(default=None, ge=0.0, le=1.0)
+    alpha: float | None = Field(default=None, ge=0.0, le=1.0)
 
 class GenerationConfig(BaseModel):
     temperature: float | None = Field(default=0.7, ge=0.0, le=1.0)
@@ -39,6 +39,7 @@ class Source(BaseModel):
     chunk_id: str | None = None
     document_id: str | None = None
     text: str
+    relevance_score: float | None = Field(default=None, ge=0.0, le=1.0)
     section_title: str | None = None
     file_name: str | None = None
     original_file_name: str | None = None

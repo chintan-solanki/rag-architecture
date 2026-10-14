@@ -51,6 +51,18 @@ class CitationRenderingTests(unittest.TestCase):
         self.assertIn("uploaded-name.pdf", source_card_html(item))
         self.assertEqual(citation_source_details(item)[0], "uploaded-name.pdf")
 
+    def test_sigmoid_relevance_score_is_shown_in_source_and_inline_cards(self) -> None:
+        item = source(1)
+        item["relevance_score"] = 0.876
+        answer = [{"text": "Claim.", "citations": [{"source_id": 1}]}]
+
+        source_card = source_card_html(item)
+        citation_card = render_answer_html(answer, [item])
+
+        for rendered in (source_card, citation_card):
+            self.assertIn("Relevance 0.88", rendered)
+            self.assertIn("not a probability or confidence estimate", rendered)
+
     def test_page_ranges_convert_zero_based_indices_to_pdf_pages(self) -> None:
         self.assertEqual(format_page_range(2, 3), "p. 3–4")
         self.assertEqual(format_page_range(2, 2), "p. 3")
@@ -290,6 +302,13 @@ class CitationRenderingTests(unittest.TestCase):
 
         self.assertIs(validate_query_response(payload), payload)
         payload["answer"][1]["citations"] = [{"source_id": 9}]
+        with self.assertRaises(ResponseValidationError):
+            validate_query_response(payload)
+
+    def test_rejects_invalid_relevance_score(self) -> None:
+        payload = {"answer": [], "sources": [source(1)]}
+        payload["sources"][0]["relevance_score"] = 1.1
+
         with self.assertRaises(ResponseValidationError):
             validate_query_response(payload)
 

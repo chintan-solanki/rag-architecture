@@ -42,6 +42,7 @@ class ApiClientTests(unittest.TestCase):
                 "use_reranker": True,
                 "top_k": 4,
                 "candidate_pool_size": 12,
+                "reranker_score_threshold": 0.5,
                 "alpha": 0.35,
             },
         )
@@ -68,6 +69,7 @@ class ApiClientTests(unittest.TestCase):
                 "use_reranker": False,
                 "top_k": 4,
                 "candidate_pool_size": None,
+                "reranker_score_threshold": None,
                 "alpha": None,
             },
         )

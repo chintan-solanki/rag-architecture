@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Any
 
 
@@ -28,6 +29,16 @@ def validate_query_response(payload: Any) -> dict[str, Any]:
         source_ids.add(source_id)
         if not isinstance(source.get("text"), str):
             raise ResponseValidationError("Each source must contain text.")
+        relevance_score = source.get("relevance_score")
+        if relevance_score is not None and (
+            not isinstance(relevance_score, (int, float))
+            or isinstance(relevance_score, bool)
+            or not math.isfinite(relevance_score)
+            or not 0.0 <= relevance_score <= 1.0
+        ):
+            raise ResponseValidationError(
+                "Source relevance_score must be a finite number between 0 and 1 or null."
+            )
         for optional_text in (
             "chunk_id",
             "document_id",
