@@ -7,7 +7,9 @@ qdrant:
   fast_embedding_model: 'BAAI/bge-small-en-v1.5'
 
 llm:
+  provider: openai
   model: gpt-4o-mini
+  api_key_env: OPENAI_API_KEY
 
 staging:
   incoming_dir_rel_path: 'staging/incoming'

@@ -2,6 +2,7 @@ from pathlib import Path
 import sys
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "common" / "src"))
@@ -12,6 +13,12 @@ from helpers.contextretrieval.chunkcontextualizedsummarygenerator import (
     ChunkContextualizedSummaryGenerator,
 )
 from models.ingestion import IndexChunk, IndexDocument
+
+LLM_CONFIG = {
+    "provider": "openai",
+    "model": "test-model",
+    "api_key_env": "OPENAI_API_KEY",
+}
 
 
 class FakeLLM:
@@ -35,13 +42,29 @@ class ChunkContextRetrievalTests(unittest.TestCase):
 
     def test_contextualized_summary_uses_containing_section_and_chunk(self) -> None:
         llm = FakeLLM("Details from the section.")
-        generator = ChunkContextualizedSummaryGenerator(model="test-model", llm=llm)
+        generator = ChunkContextualizedSummaryGenerator(
+            llm_config=LLM_CONFIG,
+            llm=llm,
+        )
 
         summary = generator.get_summary(self.chunk, self.document)
 
         self.assertEqual(summary, "summary: Details from the section.")
         self.assertIn(self.document.text, llm.prompts[0])
         self.assertIn(self.chunk.text, llm.prompts[0])
+
+    def test_contextualized_summary_builds_llm_from_provider_config(self) -> None:
+        llm = FakeLLM("Details from the section.")
+        generator = ChunkContextualizedSummaryGenerator(llm_config=LLM_CONFIG)
+
+        with patch(
+            "helpers.contextretrieval.chunkcontextualizedsummarygenerator.create_llm",
+            return_value=llm,
+        ) as create_llm:
+            header = generator.get_context_header(self.chunk, self.document)
+
+        create_llm.assert_called_once_with(LLM_CONFIG)
+        self.assertEqual(header.summary, "Details from the section.")
 
     def test_metadata_header_appends_comment(self) -> None:
         retriever = ChunkContextRetriever(
@@ -50,7 +73,7 @@ class ChunkContextRetrievalTests(unittest.TestCase):
                 comment="  Focus on the results. ",
             ),
             {"file_name": "report.pdf"},
-            "test-model",
+            LLM_CONFIG,
         )
 
         header = retriever.get_chunk_context(self.chunk, self.document)
@@ -71,7 +94,7 @@ class ChunkContextRetrievalTests(unittest.TestCase):
                 comment="Additional user context.",
             ),
             {},
-            "test-model",
+            LLM_CONFIG,
         )
         fake_llm = FakeLLM("This chunk describes the section.")
         retriever.summary_generator._llm = fake_llm
@@ -95,7 +118,7 @@ class ChunkContextRetrievalTests(unittest.TestCase):
                         comment=comment,
                     ),
                     {},
-                    "test-model",
+                    LLM_CONFIG,
                 )
 
                 self.assertEqual(
@@ -105,7 +128,7 @@ class ChunkContextRetrievalTests(unittest.TestCase):
 
     def test_blank_llm_response_fails_explicitly(self) -> None:
         generator = ChunkContextualizedSummaryGenerator(
-            model="test-model",
+            llm_config=LLM_CONFIG,
             llm=FakeLLM(" \n "),
         )
 

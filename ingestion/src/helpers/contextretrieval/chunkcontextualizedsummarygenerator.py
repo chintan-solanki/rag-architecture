@@ -1,8 +1,7 @@
-import os
-
+from typing import Any
+from common.helpers.llmfactory import create_llm
 from models.ingestion import IndexChunk, IndexDocument
 from .chunkcontextheader import ChunkContextHeader
-import dicttoxml
 
 class ChunkContextualizedSummaryGenerator:
 
@@ -10,18 +9,13 @@ class ChunkContextualizedSummaryGenerator:
     Generates contextualized summary for the chunk header. 
     The summary is generated using the section text and chunk text.
     '''
-    def __init__(self, model: str, llm=None):
-        self.model = model
+    def __init__(self, llm_config: dict[str, Any], llm=None):
+        self.llm_config = dict(llm_config)
         self._llm = llm
 
     def _get_llm(self):
         if self._llm is None:
-            from llama_index.llms.openai import OpenAI
-
-            self._llm = OpenAI(
-                model=self.model,
-                api_key=os.getenv("OPENAI_API_KEY"),
-            )
+            self._llm = create_llm(self.llm_config)
         return self._llm
 
     def get_context_header(self, chunk: IndexChunk, document: IndexDocument, comment: str = None) -> ChunkContextHeader:

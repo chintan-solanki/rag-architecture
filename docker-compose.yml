@@ -82,7 +82,9 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - HF_TOKEN=${HF_TOKEN}
       - QDRANT_URL=${QDRANT_URL:-http://qdrant:6333}
       - REDIS_HOST=${REDIS_HOST}
@@ -172,7 +174,9 @@ services:
       
     environment:
       - HF_TOKEN=${HF_TOKEN}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - DB_REL_PATH=${DB_REL_PATH}
       - QDRANT_URL=${QDRANT_URL}
       - REDIS_HOST=${REDIS_HOST}

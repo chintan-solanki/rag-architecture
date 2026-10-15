@@ -1,4 +1,5 @@
 
+from typing import Any
 from models.ingestion import IndexChunk, IndexDocument
 from common.models.ingestionconfig import ChunkHeaderType
 from .chunkmetadatasummarygenerator import ChunkMetadataSummaryGenerator
@@ -14,9 +15,9 @@ class ChunkContextRetriever:
         2. contextualized chunk summary by LLM (ChunkContextualizedSummaryGenerator)
     '''
 
-    def __init__(self, ingestion_config, file_metadata, llm_model: str):
+    def __init__(self, ingestion_config, file_metadata, llm_config: dict[str, Any]):
         if ingestion_config.chunk_header_type == ChunkHeaderType.contextualized_chunk_summary:
-            self.summary_generator = ChunkContextualizedSummaryGenerator(llm_model)
+            self.summary_generator = ChunkContextualizedSummaryGenerator(llm_config)
         else:
             self.summary_generator = ChunkMetadataSummaryGenerator(file_metadata)
         

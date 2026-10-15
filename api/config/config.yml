@@ -22,5 +22,7 @@ retrieval:
   reranker:
     model: 'Xenova/ms-marco-MiniLM-L-6-v2'
 llm:
+  provider: openai
   model: gpt-4o-mini
+  api_key_env: OPENAI_API_KEY
   

@@ -175,7 +175,7 @@ with RedisHelper() as redis_helper:
         chunk_context_retriever = ChunkContextRetriever(
             ingestion_config,
             file_metadata,
-            config["llm"]["model"],
+            config["llm"],
         )
 
         with timer('index chunks...'):

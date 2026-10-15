@@ -1,18 +1,19 @@
-import os
 from collections.abc import Iterator
+from common.helpers.llmfactory import create_llm
 from ..models.query import GenerationConfig
 from ..telemetry import telemetry
 
 class GenerationService:
     def __init__(self, config, model: str | None = None):
         self.config = config
-        self.model = model or config['llm']['model']
+        self.llm_config = dict(config["llm"])
+        if model is not None:
+            self.llm_config["model"] = model
         self._llm = None
 
     def _get_llm(self):
         if self._llm is None:
-            from llama_index.llms.openai import OpenAI
-            self._llm = OpenAI(model=self.model, api_key=os.getenv("OPENAI_API_KEY"))
+            self._llm = create_llm(self.llm_config)
         return self._llm
 
     def generate(
