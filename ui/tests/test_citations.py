@@ -139,6 +139,22 @@ class CitationRenderingTests(unittest.TestCase):
         self.assertNotIn('title="', rendered)
         self.assertNotIn("Section", rendered)
 
+    def test_newline_after_citation_keeps_following_block_below_badge(self) -> None:
+        answer = [
+            {
+                "text": "1. First point.",
+                "citations": [{"source_id": 1}],
+            },
+            {
+                "text": "\n2. Second point.",
+                "citations": [{"source_id": 2}],
+            },
+        ]
+
+        rendered = render_answer_html(answer, [source(1), source(2)])
+
+        self.assertIn("</div></div><br />\n2. Second point.", rendered)
+
     def test_citation_count_suffix_is_inside_bubble_but_not_link_target(self) -> None:
         rendered = render_answer_html(
             [

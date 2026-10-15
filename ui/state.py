@@ -29,6 +29,9 @@ def initialize_state(session_state: Any) -> None:
         "reranker_score_threshold": DEFAULT_RERANKER_SCORE_THRESHOLD,
         "retrieval_alpha": DEFAULT_RETRIEVAL_ALPHA,
         "generation_temperature": DEFAULT_GENERATION_CONFIG["temperature"],
+        "generation_max_output_tokens": DEFAULT_GENERATION_CONFIG[
+            "max_output_tokens"
+        ],
         "generation_top_p": DEFAULT_GENERATION_CONFIG["top_p"],
         "current_question": "",
         "streamed_answer": "",

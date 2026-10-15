@@ -13,23 +13,25 @@ class CitationMatcher:
                 r'\[': '['
             },
             '[': {r'\[': '[['},
-            '[[': {r'c': '[[c'},
-            '[[c': {r'i': '[[ci'},
-            '[[ci': {r't': '[[cit'},
-            '[[cit': {r'e': '[[cite'},
-            '[[cite': {r'\]': '[[cite]'},
-            '[[cite]': {r'\]': '[[cite]]'},
-            '[[cite]]': {r'\[': '[[cite]][_start'},
-            '[[cite]][_start': {r'\d': '[[cite]][_id_matched'},
-            '[[cite]][_id_matched': {
-                r'\d': '[[cite]][_id_matched',
-                r',': '[[cite]][_await_next_id',
+            '[[': {r's': '[[s'},
+            '[[s': {r'o': '[[so'},
+            '[[so': {r'u': '[[sou'},
+            '[[sou': {r'r': '[[sour'},
+            '[[sour': {r'c': '[[sourc'},
+            '[[sourc': {r'e': '[[source'},
+            '[[source': {r'\]': '[[source]'},
+            '[[source]': {r'\]': '[[source]]'},
+            '[[source]]': {r'\[': '[[source]][_start'},
+            '[[source]][_start': {r'\d': '[[source]][_id_matched'},
+            '[[source]][_id_matched': {
+                r'\d': '[[source]][_id_matched',
+                r',': '[[source]][_await_next_id',
                 r']': 'end'
                 },
-            '[[cite]][_await_next_id': {r'\d': '[[cite]][_id_matched'},
+            '[[source]][_await_next_id': {r'\d': '[[source]][_id_matched'},
             'end' : {
                 r'\[': '[',
-                r'[\s\W]': 'end'
+                r'[^\w\r\n]': 'end'
             },
         }
 
@@ -65,7 +67,7 @@ class CitationProcessor:
 
     def _extract_citation_ids(self, citation_block = ''):
         source_ids = []
-        matchobj = re.match(r'\s*\[\[cite\]\]\[(.*)\]', citation_block)
+        matchobj = re.match(r'\s*\[\[source\]\]\[(.*)\]', citation_block)
         
         if matchobj and matchobj.group(1):
 
@@ -161,7 +163,7 @@ class CitationProcessor:
             
 
 if __name__ == '__main__':
-    chunks = ["Tr" , "um" ,  "or" ,  "GPT" ,  " is" , " a" ,  " specialized" , " language" , " model" , " designed" , " to" , " address" ,     " health" ,     " and" ,     " medical" ,     " misinformation" ,     "." ,     " It" ,     " incorporates" ,     " domain" ,     "-specific" ,     " knowledge" ,     "," ,     " particularly" ,     " through" ,     " the" ,     " use" ,     " of" ,     " semantic" ,     " health" ,     " knowledge" ,     " graphs" ,     "," ,     " which" ,     " allows" ,     " it" ,     " to" ,     " identify" ,     " nuances" ,     " in" ,     " health" ,     "-related" ,     " claims" ,     " effectively" ,     "." ,     " This" ,     " specialization" ,     " enhances" ,     " its" ,     " accuracy" ,     " and" ,     " reliability" ,     " in" ,     " fact" ,     "-check" ,     "ing" ,     " health" ,     " information" ,     " " ,  "[[cite]]" ,     "[1" ,     ",2]." ,     " Additionally" ,     "," ,     " Tr" ,     "um" ,     "or" ,     "GPT" ,     " is" ,  " noted" , " for" , " its" , " efficiency" , "," , " generating" , " concise" , " responses" , " with" , " an" , " average" , " of" , " " , "2" ,  "." , "8" , " sentences" ,  "," , " which" , " is" , " lower" , " than" ,  " other" , " models" , " evaluated" ,  "." , " This" , " conc" ,  "isen" ,  "ess" ,  " aids" ,  " users" , " in" ,  " quickly" ,  " understanding" ,  " fact" , "-check" , "ing" ,  " results" ,  " without" , " excessive" , " detail" ,  " " ,  "[[cite]]" ,  "[1" ,  "]." ]
+    chunks = ["Tr" , "um" ,  "or" ,  "GPT" ,  " is" , " a" ,  " specialized" , " language" , " model" , " designed" , " to" , " address" ,     " health" ,     " and" ,     " medical" ,     " misinformation" ,     "." ,     " It" ,     " incorporates" ,     " domain" ,     "-specific" ,     " knowledge" ,     "," ,     " particularly" ,     " through" ,     " the" ,     " use" ,     " of" ,     " semantic" ,     " health" ,     " knowledge" ,     " graphs" ,     "," ,     " which" ,     " allows" ,     " it" ,     " to" ,     " identify" ,     " nuances" ,     " in" ,     " health" ,     "-related" ,     " claims" ,     " effectively" ,     "." ,     " This" ,     " specialization" ,     " enhances" ,     " its" ,     " accuracy" ,     " and" ,     " reliability" ,     " in" ,     " fact" ,     "-check" ,     "ing" ,     " health" ,     " information" ,     " " ,  "[[source]]" ,     "[1" ,     ",2]." ,     " Additionally" ,     "," ,     " Tr" ,     "um" ,     "or" ,     "GPT" ,     " is" ,  " noted" , " for" , " its" , " efficiency" , "," , " generating" , " concise" , " responses" , " with" , " an" , " average" , " of" , " " , "2" ,  "." , "8" , " sentences" ,  "," , " which" , " is" , " lower" , " than" ,  " other" , " models" , " evaluated" ,  "." , " This" , " conc" ,  "isen" ,  "ess" ,  " aids" ,  " users" , " in" ,  " quickly" ,  " understanding" ,  " fact" , "-check" , "ing" ,  " results" ,  " without" , " excessive" , " detail" ,  " " ,  "[[source]]" ,  "[1" ,  "]." ]
     
     processor = CitationProcessor()
     source_text = ''.join(chunks)

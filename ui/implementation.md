@@ -102,7 +102,7 @@ Use a single sidebar page selector in the app shell (or an equivalent navigation
 1. Render **Search Settings** above the question field:
    - First row: Top K combobox (`1`–`10`, default `3`), retrieval type (`hybrid`, `dense`, `bm25`), and alpha slider (`0`–`1`, default `0.5`) shown only for hybrid. Put "Dense weight for Relative Score Fusion" in the alpha slider tooltip.
    - Second row: **Use re-ranker** checkbox (default checked), candidate pool size, and re-ranker score threshold slider when re-ranking is enabled. Candidate pool defaults to `10`; hide its controls when re-ranking is disabled. Center the checkbox within its column.
-   - Generation row: temperature slider (`0`–`1`, default `0.1`) and Top-p slider (`0.5`–`1.0`, default `1.0`).
+   - Generation row: max completion tokens integer input (`1`–`2048`, default `512`), temperature slider (`0`–`1`, default `0.1`), and Top-p slider (`0.5`–`1.0`, default `1.0`).
    - Persist all settings in session state so they survive reruns and page navigation.
 2. Provide a compact multiline question input with placeholder `Ask a question!` and an **Ask question** button to its right. Keep the input about two lines high. Trim only for empty-input validation; submit the user's entered question otherwise.
 3. On valid submission, first replace/clear previous query state, store the submitted question, and mark a query active. Disable Ask until the stream ends or errors.
@@ -126,10 +126,10 @@ Use a single sidebar page selector in the app shell (or an equivalent navigation
    }
    ```
 
-   Set hidden conditional retrieval fields to `null`. The API passes the
-   configurations to the retrieval and generation services, but does not yet
-   apply the candidate-pool, alpha, re-ranker, or generation options to their
-   algorithms.
+   Set hidden conditional retrieval fields to `null`. The API passes generation
+   settings to the LLM, mapping `max_output_tokens` to its `max_tokens`
+   parameter. Candidate-pool, alpha, and re-ranker options are not currently
+   applied to retrieval algorithms.
 
 5. Read and decode SSE events incrementally. Append each `answer_delta.data.text` to the streamed text and immediately rerender the accumulated plain answer. Handle an API `error` event as an incomplete stream failure. Stop at the first valid `completed` event.
 6. On normal stream termination without `completed`, preserve streamed text, display a clear incomplete-answer error, do not create citations/sources, and restore the Ask control. For HTTP errors, display the error in the answer area with no stale prior result.

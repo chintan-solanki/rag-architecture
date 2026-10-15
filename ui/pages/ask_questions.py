@@ -36,6 +36,9 @@ def render_ask_questions(api_client: RagApiClient, client_id: str) -> None:
     st.session_state.generation_temperature_widget = (
         st.session_state.generation_temperature
     )
+    st.session_state.generation_max_output_tokens_widget = (
+        st.session_state.generation_max_output_tokens
+    )
     st.session_state.generation_top_p_widget = st.session_state.generation_top_p
 
     top_k_column, retrieval_column, alpha_column = st.columns(
@@ -112,7 +115,16 @@ def render_ask_questions(api_client: RagApiClient, client_id: str) -> None:
         reranker_score_threshold = st.session_state.reranker_score_threshold
 
     st.subheader("Generation Config")
-    temperature_column, top_p_column = st.columns(2)
+    max_output_tokens_column, temperature_column, top_p_column = st.columns(3)
+    with max_output_tokens_column:
+        max_output_tokens = st.number_input(
+            "Max completion tokens",
+            min_value=1,
+            max_value=2048,
+            step=1,
+            key="generation_max_output_tokens_widget",
+            on_change=_persist_generation_max_output_tokens,
+        )
     with temperature_column:
         temperature = st.slider(
             "Temperature",
@@ -168,6 +180,7 @@ def render_ask_questions(api_client: RagApiClient, client_id: str) -> None:
                 candidate_pool_size=candidate_pool_size,
                 reranker_score_threshold=reranker_score_threshold,
                 alpha=alpha,
+                max_output_tokens=max_output_tokens,
                 temperature=temperature,
                 top_p=top_p,
             )
@@ -218,6 +231,12 @@ def _persist_generation_temperature() -> None:
     )
 
 
+def _persist_generation_max_output_tokens() -> None:
+    st.session_state.generation_max_output_tokens = (
+        st.session_state.generation_max_output_tokens_widget
+    )
+
+
 def _persist_generation_top_p() -> None:
     st.session_state.generation_top_p = st.session_state.generation_top_p_widget
 
@@ -230,6 +249,7 @@ def _build_query_configs(
     candidate_pool_size: int | None,
     reranker_score_threshold: float = 0.5,
     alpha: float,
+    max_output_tokens: int,
     temperature: float,
     top_p: float,
 ) -> tuple[
@@ -249,6 +269,7 @@ def _build_query_configs(
         },
         {
             **DEFAULT_GENERATION_CONFIG,
+            "max_output_tokens": max_output_tokens,
             "temperature": temperature,
             "top_p": top_p,
         },

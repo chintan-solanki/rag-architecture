@@ -89,7 +89,7 @@ class GenerationService:
         
         ### Structure of source chunks
 
-        * Each source chunk starts with 'Source [source_id]' line, where source_id is a numeric id of the source. 
+        * Each source chunk starts with 'Source [ID]' line, where ID is a numeric id of the source.
         * Then next few lines contain <ChunkContext>..</ChunkContext> block, which provides summary details about the source chunk.
         * The actual source chunk text follows.
 
@@ -116,25 +116,44 @@ class GenerationService:
         {context}
     
         ### Citation format
-            
-        `[[cite]][1]`
-    
-        For multiple sources, use a comma-separated list:
-    
-        `[[cite]][1,3,7]`
-    
-        Here the number(s) inside the single square brackets are the source ids listed against each retrieved source.
+
+        Use the exact literal marker `[[source]]`, immediately followed by square brackets containing
+        the numeric source ID or IDs from the retrieved sources. Do not replace `source` with another
+        word, a source ID, or the placeholder `source_id`.
+
+        For example, if a retrieved chunk is labeled `Source [7]`, use:
+
+        `The source supports this claim. [[source]][7]`
+
+        If the relevant chunks are labeled `Source [1]`, `Source [3]`, and `Source [7]`, cite multiple
+        sources supporting the same sentence with a comma-separated list and no spaces:
+
+        `[[source]][1,3,7]`
+
+        For example: `The sources support this claim. [[source]][1,3,7]`
+
+        The numbers must match the IDs in the `Source [number]` lines in the retrieved sources.
         
         ### Citation Rules:
             
-        * Cite factual claims when they are supported by the provided sources.
+        * Cite every factual sentence supported by the provided sources. If a sentence contains multiple
+          factual claims, the citation must support all of them; include every relevant source ID in one
+          citation block. If one sentence contains claims supported by different sources, include all
+          those source IDs in that block.
         * Use only source IDs provided in the context. Never invent, modify, or guess a source ID.
-        * Place the citation immediately after the claim it supports.
-        * Ensure citation appears only after completed sentences (after . and ?, not before them)
+        * Put the citation immediately after the sentence-ending punctuation (`.`, `?`, or `!`), with
+          no punctuation between the sentence and citation. Do not put a citation before the punctuation.
+        * When the answer has separate blocks, such as numbered items, bullets, or paragraphs, start each
+          block on a new line. Put the line break after the citation block, not between the
+          sentence punctuation and its citation. For example:
+
+          `1. First point. [[source]][1]`
+          `2. Second point. [[source]][2]`
         * Do not add whitespace inside the source-ID list.
-        * Each source ID may contain only numbers; do not prefix IDs with `s`.
-        * For an unanswerable question, state that it cannot be answered from the provided sources and follow that statement with the standalone citation block `[[cite]][0]`.
-        * `0` is a special null-source marker, not a source ID. Never combine it with real source IDs or use it to cite a factual claim.
+        * Each source ID must contain only numbers; do not prefix IDs with `s`.
+        * If a question cannot be answered from the sources, state this briefly and follow that sentence
+          with the standalone citation block `[[source]][0]`. Use `0` only for this abstention marker:
+          never combine it with real source IDs or use it to cite a factual claim.
 
         
         ## Query: 

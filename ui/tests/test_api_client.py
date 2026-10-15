@@ -24,13 +24,14 @@ class FakeResponse:
 
 
 class ApiClientTests(unittest.TestCase):
-    def test_query_config_builder_includes_visible_and_default_settings(self) -> None:
+    def test_query_config_builder_includes_visible_and_selected_settings(self) -> None:
         retrieval_config, generation_config = _build_query_configs(
             retrieval_type="hybrid",
             use_reranker=True,
             top_k=4,
             candidate_pool_size=12,
             alpha=0.35,
+            max_output_tokens=768,
             temperature=0.1,
             top_p=1.0,
         )
@@ -48,7 +49,7 @@ class ApiClientTests(unittest.TestCase):
         )
         self.assertEqual(
             generation_config,
-            {"temperature": 0.1, "max_output_tokens": 512, "top_p": 1.0},
+            {"temperature": 0.1, "max_output_tokens": 768, "top_p": 1.0},
         )
 
     def test_non_hybrid_query_omits_hidden_retrieval_fields(self) -> None:
@@ -58,6 +59,7 @@ class ApiClientTests(unittest.TestCase):
             top_k=4,
             candidate_pool_size=None,
             alpha=0.5,
+            max_output_tokens=512,
             temperature=0.1,
             top_p=1.0,
         )
